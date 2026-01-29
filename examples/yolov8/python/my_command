@@ -1,0 +1,5 @@
+onnx 模型转rknn: 
+  python convert.py ../model/yolov8n.onnx rk3588 i8 ../model/yolov8n.rknn
+
+编译项目：
+  ./build-linux.sh -t rk3588 -a aarch64 -d blaze_hand_detect

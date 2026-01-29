@@ -1,0 +1,11 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+model_path=./model/wire_foucs.rknn
+input_width=640
+input_height=640
+score_threshold=0.7f
+
+//检测帧数阈值
+max_frame_threshold=3

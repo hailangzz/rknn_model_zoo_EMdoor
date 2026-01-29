@@ -1,0 +1,3 @@
+g++ capture_video.cpp -o capture_video `pkg-config --cflags --libs opencv4` ./capture_video
+
+aarch64-linux-gnu-g++ capture_video.cpp -o capture_video `pkg-config --cflags --libs opencv4`

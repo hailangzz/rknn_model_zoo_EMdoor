@@ -1,0 +1,23 @@
+
+# 编译指令：
+  #编译x86项目
+  catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=./aarch64-toolchain.cmake
+
+  #编译aarch64项目
+  catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/aarch64-toolchain.cmake
+
+
+激活板端catkin环境
+  source /opt/ros/noetic/setup.bash
+
+  编译指令：
+    catkin_make
+
+激活编译好的程序环境
+
+  source devel/setup.bash
+
+执行指令
+  rosrun carpet_detect_subscriber carpet_detect_listener
+
+  rosrun my_image_pkg image_listener  

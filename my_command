@@ -1,0 +1,45 @@
+### VScode查看md文件：ctrl+k V
+
+python 模型效果测试：
+python yolov8.py --model_path=../model/WireDetectModel.onnx --img_folder=../database_test --img_save
+
+python yolov8.py --model_path=../model/yolov8n.onnx --img_show --img_save
+
+
+onnx 模型转rknn: 
+
+  python convert.py ../model/WireDetectModel.onnx rk3588 u8 ../model/WireDetectModel.rknn
+  python convert.py ../model/wire_foucs.onnx rk3588 u8 ../model/wire_foucs.rknn
+
+  python convert.py ../model/yolov8n.onnx rk3588 i8 ../model/yolov8n.rknn
+
+编译项目：
+  ./build-android.sh -t rk3568 -a arm64-v8a -d yolov8
+
+  ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_WireDetect
+
+  ./build-linux-my-program.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
+
+  编译yolov8_seg项目
+    ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_seg_carpet
+
+  
+  编译接口项目
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_HandDetectProject
+
+
+  ./build-android-my-interface.sh -t rk3588 -a arm64-v8a -d yolov8_CarpetDetectProject
+
+  ./build-android-my-interface.sh -t rk3568 -a arm64-v8a -d yolov8_HandDetectProject
+
+
+板端程序测试：
+./rknn_yolov8_demo model/WireDetectModel.rknn model/wire.jpg
+
+
+
+
+
+
+

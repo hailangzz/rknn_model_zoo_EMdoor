@@ -1,0 +1,35 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+model_path=./model/carpet_f_v3.rknn
+input_width=640
+input_height=640
+score_threshold=0.7f
+
+//检测帧数阈值
+max_frame_threshold=3
+
+CARPET_AREA=60
+
+//相机坐标系：远端Z轴比例缩放
+camera_z_axle_top_resize_rate=1.0
+camera_z_axle_polyfit_w0=0.2220
+camera_z_axle_polyfit_w1=0.8531
+camera_z_axle_polyfit_w2=0.1568
+
+//相机内参、高度、俯仰角度 (俯仰角 15° ~ 20° 常见)
+camera_fx=411.381960
+camera_fy=411.535817
+camera_cx=637.411269
+camera_cy=351.293005
+camera_H=0.209539
+camera_pitch=-0.0318038
+camera_D_0=1.171783
+camera_D_1=0.226351
+camera_D_2=0.000015
+camera_D_3=0.000199
+camera_D_4=0.003289
+camera_D_5=1.455798
+camera_D_6=0.474246
+camera_D_7=0.024653

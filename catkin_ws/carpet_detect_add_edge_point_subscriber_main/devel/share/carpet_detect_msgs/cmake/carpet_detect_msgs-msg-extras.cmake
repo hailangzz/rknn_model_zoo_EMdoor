@@ -1,0 +1,2 @@
+set(carpet_detect_msgs_MESSAGE_FILES "/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/src/carpet_detect_msgs/msg/CameraCoordinate.msg;/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/src/carpet_detect_msgs/msg/ObjectCameraDetectResult.msg;/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/src/carpet_detect_msgs/msg/ObjectCameraDetectResultArray.msg")
+set(carpet_detect_msgs_SERVICE_FILES "")

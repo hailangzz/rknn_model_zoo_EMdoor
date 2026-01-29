@@ -1,0 +1,8 @@
+prefix=/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/devel
+
+Name: carpet_detect_msgs
+Description: Description of carpet_detect_msgs
+Version: 0.0.1
+Cflags: -I/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/devel/include
+Libs: -L${prefix}/lib 
+Requires: message_runtime std_msgs

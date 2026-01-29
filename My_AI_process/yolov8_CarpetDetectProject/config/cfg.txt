@@ -1,0 +1,19 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+model_path=./model/carpet_sa_v2.rknn
+input_width=640
+input_height=640
+score_threshold=0.7f
+
+//检测帧数阈值
+max_frame_threshold=3
+
+//相机内参、高度、俯仰角度 (俯仰角 15° ~ 20° 常见)
+camera_fx=1280
+camera_fy=640
+camera_cx=320
+camera_cy=240
+camera_H=0.3
+camera_pitch=0.2618
