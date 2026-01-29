@@ -25,8 +25,8 @@ class HandDetectStateController{
     bool in_block_state_ = false;  // 是否处于 3 秒屏蔽
     std::chrono::steady_clock::time_point block_start_time_;
 
-    float max_detect_duration_s_ = 180.0f;  // 180 秒触发屏蔽
-    float block_duration_s_ = 3.0f;         // 屏蔽持续 3 秒
+    float max_detect_duration_s_;  // 180 秒触发屏蔽
+    float block_duration_s_;         // 屏蔽持续 3 秒
 
 };
 
