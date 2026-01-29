@@ -31,13 +31,21 @@ ConfigInfo readConfig(const std::string& filename) {
     cfg_values.max_frame_threshold = std::stoi(config["max_frame_threshold"]);
     cfg_values.debug_nv21_image_saver = config.at("debug_nv21_image_saver");
     
-    cfg_values.center_x = std::stoi(config["center_x"]);
-    cfg_values.center_y  = std::stoi(config["center_y"]);
-    cfg_values.axes_w  = std::stoi(config["axes_w"]);
-    cfg_values.axes_h  = std::stoi(config["axes_h"]);
-    cfg_values.target_effective_area_iou_thread = std::stof(config["target_effective_area_iou_thread"]);
-    cfg_values.max_detect_duration_s  = std::stof(config["max_detect_duration_s"]);
-    cfg_values.block_duration_s  = std::stof(config["block_duration_s"]);
+    // cfg_values.center_x = std::stoi(config["center_x"]);
+    // cfg_values.center_y  = std::stoi(config["center_y"]);
+    // cfg_values.axes_w  = std::stoi(config["axes_w"]);
+    // cfg_values.axes_h  = std::stoi(config["axes_h"]);
+    // cfg_values.target_effective_area_iou_thread = std::stof(config["target_effective_area_iou_thread"]);
+    // cfg_values.max_detect_duration_s  = std::stof(config["max_detect_duration_s"]);
+    // cfg_values.block_duration_s  = std::stof(config["block_duration_s"]);
+
+    cfg_values.center_x = 252;
+    cfg_values.center_y  = 234;
+    cfg_values.axes_w  = 210;
+    cfg_values.axes_h  = 200;
+    cfg_values.target_effective_area_iou_thread = 0.5f;
+    cfg_values.max_detect_duration_s  = 180.0f;
+    cfg_values.block_duration_s  = 3.0f;
 
     //相机参数配置：
     cfg_values.camera_fx = std::stof(config["camera_fx"]); 

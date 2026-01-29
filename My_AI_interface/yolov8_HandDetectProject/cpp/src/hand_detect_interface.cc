@@ -12,7 +12,7 @@
 #include <cstdio>    // 用于 snprintf
 #include <iostream>  // std::cout, std::cerr
 
-#define ANDROID_ENV 0   // 0: Linux, 1: Android
+#define ANDROID_ENV 1   // 0: Linux, 1: Android
 
 #if ANDROID_ENV
     #include <android/log.h>
