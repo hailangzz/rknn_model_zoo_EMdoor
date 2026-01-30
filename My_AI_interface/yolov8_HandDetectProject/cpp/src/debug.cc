@@ -7,18 +7,19 @@
 #include <sstream>
 #include <iomanip>
 // #include "utils.hpp"
+#include "logs.h"
 
 
-#if ANDROID_ENV
-    #include <android/log.h>
-    #define LOG_TAG "HandDetectDebug"
-    #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-    #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-    #define LOGI(msg) std::cout << "[INFO] " << msg << std::endl
-    #define LOGE(msg) std::cerr << "[ERROR] " << msg << std::endl
+// #if ANDROID_ENV
+//     #include <android/log.h>
+//     #define LOG_TAG "HandDetectDebug"
+//     #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+//     #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+// #else
+//     #define LOGI(msg) std::cout << "[INFO] " << msg << std::endl
+//     #define LOGE(msg) std::cerr << "[ERROR] " << msg << std::endl
 
-#endif
+// #endif
 
 
 // --------------------- 工具：递归创建目录 ---------------------
@@ -52,8 +53,8 @@ static bool makeDirsRecursive(const std::string& path)
             return false;
         }
     }
-    // LOGI("[Debug] Directory exists or created: %s", path.c_str());
-    LOGI("[Debug] Directory exists or created: " << path.c_str());
+    LOGI("[Debug] Directory exists or created: %s", path.c_str());
+    // LOGI("[Debug] Directory exists or created: " << path.c_str());
     return true;
 }
 
@@ -124,22 +125,22 @@ void DebugNv21Saver::saveRgbFrame(const AndroidImageNV21& img)
         std::string filename = generateFileName();
 
         if (!cv::imwrite(filename, rgb)) {
-            // LOGE("[Debug] imwrite failed: %s", filename.c_str());
-            LOGE("[Debug] imwrite failed: " << filename.c_str());
+            LOGE("[Debug] imwrite failed: %s", filename.c_str());
+            // LOGE("[Debug] imwrite failed: " << filename.c_str());
             return;
         }
 
-        // LOGI("[Debug] Saved RGB frame: %s", filename.c_str());
-        LOGI("[Debug] Saved RGB frame: " << filename.c_str());
+        LOGI("[Debug] Saved RGB frame: %s", filename.c_str());
+        // LOGI("[Debug] Saved RGB frame: " << filename.c_str());
     }
     catch (const cv::Exception& e) {
-        // LOGE("[Debug] OpenCV exception: %s", e.what());
-        LOGE("[Debug] OpenCV exception: " << e.what());
+        LOGE("[Debug] OpenCV exception: %s", e.what());
+        // LOGE("[Debug] OpenCV exception: " << e.what());
         
     }
     catch (const std::exception& e) {
-        // LOGE("[Debug] std exception: %s", e.what());
-        LOGE("[Debug] std exception: " << e.what());
+        LOGE("[Debug] std exception: %s", e.what());
+        // LOGE("[Debug] std exception: " << e.what());
     }
     catch (...) {
         LOGE("[Debug] Unknown exception in saveRgbFrame");

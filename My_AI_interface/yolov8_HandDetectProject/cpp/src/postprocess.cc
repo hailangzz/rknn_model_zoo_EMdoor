@@ -742,7 +742,10 @@ bool bboxEllipseOverlapRatio(
     float ratio = static_cast<float>(inside_count) / total_count;
     
     // 输出 ratio 信息
-    printf("bboxEllipseOverlapRatio: inside_count=%d, total_count=%d, ratio=%.4f, threshold=%.4f\n",
+    // printf("bboxEllipseOverlapRatio: inside_count=%d, total_count=%d, ratio=%.4f, threshold=%.4f\n",
+    //        inside_count, total_count, ratio, threshold);
+
+    LOGI("bboxEllipseOverlapRatio: inside_count=%d, total_count=%d, ratio=%.4f, threshold=%.4f\n",
            inside_count, total_count, ratio, threshold);
 
     return ratio >= threshold;

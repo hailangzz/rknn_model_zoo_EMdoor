@@ -26,7 +26,7 @@ debug_nv21_image_saver=/home/robot/zhangzhuo/result_images
 //is_crop=1   //1：剪切、0：不剪切
 center_x=252
 center_y=234
-axes_w=210
+axes_w=190
 axes_h=200
 
 //椭圆区域裁剪 1280*720

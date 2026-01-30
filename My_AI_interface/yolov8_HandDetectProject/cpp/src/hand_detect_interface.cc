@@ -7,34 +7,35 @@
 #include <unistd.h>
 #include "image_drawing.h"
 #include "event_control.h"
+#include "logs.h"
 
 #include <mutex>
 #include <cstdio>    // 用于 snprintf
 #include <iostream>  // std::cout, std::cerr
 
-#define ANDROID_ENV 1   // 0: Linux, 1: Android
+// #define ANDROID_ENV 1   // 0: Linux, 1: Android
 
-#if ANDROID_ENV
-    #include <android/log.h>
-    #define LOG_TAG "HandDetectNative"
-    #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-    #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-    // Linux 下 printf 风格宏
-    #define LOGI(fmt, ...) \
-        do { \
-            char buf[512]; \
-            snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
-            std::cout << "[INFO] " << buf << std::endl; \
-        } while(0)
+// #if ANDROID_ENV
+//     #include <android/log.h>
+//     #define LOG_TAG "HandDetectNative"
+//     #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+//     #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+// #else
+//     // Linux 下 printf 风格宏
+//     #define LOGI(fmt, ...) \
+//         do { \
+//             char buf[512]; \
+//             snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+//             std::cout << "[INFO] " << buf << std::endl; \
+//         } while(0)
 
-    #define LOGE(fmt, ...) \
-        do { \
-            char buf[512]; \
-            snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
-            std::cerr << "[ERROR] " << buf << std::endl; \
-        } while(0)
-#endif
+//     #define LOGE(fmt, ...) \
+//         do { \
+//             char buf[512]; \
+//             snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+//             std::cerr << "[ERROR] " << buf << std::endl; \
+//         } while(0)
+// #endif
 
 // ====================== 配置路径 & 读取 ======================
 static std::string& getConfigPath() {
@@ -201,59 +202,56 @@ HandDetectResult hand_detect_interface(
         }
         LOGI("saveRgbFrameDetect is ok\n");
 
-        // // 货架平台区域内，人手有效性检查
-        // std::vector<object_detect_result> filtered_results;
-        // {
-        //     std::lock_guard<std::mutex> lock(detector_mutex); // 保护 object_detect_result_list_
-        //     for (const auto& obj : detector.object_detect_result_list_)
-        //     {
-        //         const image_rect_t& box = obj.box;           
+        // 货架平台区域内，人手有效性检查
+        std::vector<object_detect_result> filtered_results;
+        {
+            std::lock_guard<std::mutex> lock(detector_mutex); // 保护 object_detect_result_list_
+            for (const auto& obj : detector.object_detect_result_list_)
+            {
+                const image_rect_t& box = obj.box;           
 
-        //         bool valid = bboxEllipseOverlapRatio(
-        //             box.left, box.top, box.right, box.bottom,
-        //             getConfig().center_x,
-        //             getConfig().center_y,
-        //             getConfig().axes_w,
-        //             getConfig().axes_h,
-        //             getConfig().target_effective_area_iou_thread,
-        //             20
-        //         );
+                bool valid = bboxEllipseOverlapRatio(
+                    box.left, box.top, box.right, box.bottom,
+                    getConfig().center_x,
+                    getConfig().center_y,
+                    getConfig().axes_w,
+                    getConfig().axes_h,
+                    getConfig().target_effective_area_iou_thread,
+                    20
+                );
 
-        //         if (valid)
-        //             filtered_results.push_back(obj);
-        //     }
-        // }
+                if (valid)
+                    filtered_results.push_back(obj);
+            }
+        }
 
-        // LOGI("filtered_results.size = %zu", filtered_results.size());
-        // for (size_t i = 0; i < filtered_results.size(); ++i)
-        // {
-        //     const auto& box = filtered_results[i].box;
-        //     LOGI("box[%zu]: L=%d T=%d R=%d B=%d",
-        //         i, box.left, box.top, box.right, box.bottom);
-        // }
+        LOGI("filtered_results.size = %zu", filtered_results.size());
+        for (size_t i = 0; i < filtered_results.size(); ++i)
+        {
+            const auto& box = filtered_results[i].box;
+            LOGI("box[%zu]: L=%d T=%d R=%d B=%d",
+                i, box.left, box.top, box.right, box.bottom);
+        }
 
-        // {
-        //     std::lock_guard<std::mutex> lock(state_mutex);
-        //     hand_detect_event_result = state.update(!filtered_results.empty());
-        // }
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            hand_detect_event_result = state.update(!filtered_results.empty());
+        }
 
+        LOGI("HandDetectState update: event_state=%d", hand_detect_event_result);
+
+        if (img_buf.virt_addr) {
+            free(img_buf.virt_addr);
+            img_buf.virt_addr = NULL;
+        }
         
 
-        // LOGI("HandDetectState update: event_state=%d", hand_detect_event_result);
-
-
-        // if (img_buf.virt_addr) {
-        //     free(img_buf.virt_addr);
-        //     img_buf.virt_addr = NULL;
-        // }
-        
-
-        return is_exist_hand
-               ? HandDetectResult::HandDetected
-               : HandDetectResult::NoHand;
-        // return hand_detect_event_result
+        // return is_exist_hand
         //        ? HandDetectResult::HandDetected
         //        : HandDetectResult::NoHand;
+        return hand_detect_event_result
+               ? HandDetectResult::HandDetected
+               : HandDetectResult::NoHand;
     }
 
     catch (...) {
