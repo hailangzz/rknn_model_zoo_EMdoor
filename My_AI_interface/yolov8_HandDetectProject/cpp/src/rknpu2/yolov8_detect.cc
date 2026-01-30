@@ -39,9 +39,9 @@ ConfigInfo readConfig(const std::string& filename) {
     // cfg_values.max_detect_duration_s  = std::stof(config["max_detect_duration_s"]);
     // cfg_values.block_duration_s  = std::stof(config["block_duration_s"]);
 
-    cfg_values.center_x = 252;
+    cfg_values.center_x = 260;
     cfg_values.center_y  = 234;
-    cfg_values.axes_w  = 210;
+    cfg_values.axes_w  = 190;
     cfg_values.axes_h  = 200;
     cfg_values.target_effective_area_iou_thread = 0.5f;
     cfg_values.max_detect_duration_s  = 180.0f;
