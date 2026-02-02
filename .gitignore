@@ -47,6 +47,22 @@ result/
 *DS_Store*
 
 
+
 # for unittest
 unittest/example_test_result
 unittest/env_config.py
+
+#忽略examples 官方示例代码
+examples
+#忽略datasets下的所有图片
+datasets/**/*.{jpg,jpeg,png,bmp}
+datasets/
+#忽略3rdparty 官方第三方库，可以另行下载
+3rdparty
+
+
+# 忽略手势识别项目不必要文件
+My_AI_interface/yolov8_HandDetectProject/database_test/
+
+
+

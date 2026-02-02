@@ -146,3 +146,17 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../config/cfg.txt DESTINATION config)
 
 file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
 install(FILES ${RKNN_FILES} DESTINATION model)
+
+
+# # 设置版本号和时间戳
+# set(LIBRARY_VERSION "HandDetect:1.0.0")
+# execute_process(COMMAND date "+%Y-%m-%d_%H-%M-%S" OUTPUT_VARIABLE CMAKE_DATE)
+# string(STRIP ${CMAKE_DATE} CMAKE_DATE)
+# set(BUILD_TIMESTAMP "${CMAKE_DATE}")
+
+# # 生成 version.h 文件，替换 version.h.in 中的占位符
+# configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/include/version.h)
+
+# 查看此动态库版本信息的命令：nm -gC lib/libhand_detect_interface.so | grep "LIBRARY_VERSION"
+                        # strings libhand_detect_interface.so | grep "Library Version"
+                        # strings libhand_detect_interface.so | grep "Build Timestamp"
