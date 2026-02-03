@@ -157,6 +157,5 @@ install(FILES ${RKNN_FILES} DESTINATION model)
 # # 生成 version.h 文件，替换 version.h.in 中的占位符
 # configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/include/version.h)
 
-# 查看此动态库版本信息的命令：nm -gC lib/libhand_detect_interface.so | grep "LIBRARY_VERSION"
-                        # strings libhand_detect_interface.so | grep "Library Version"
-                        # strings libhand_detect_interface.so | grep "Build Timestamp"
+# # 查看此动态库版本信息的命令：nm -gC libhand_detect_interface.so | grep "version info"
+#                         # strings libhand_detect_interface.so | grep "version info"
