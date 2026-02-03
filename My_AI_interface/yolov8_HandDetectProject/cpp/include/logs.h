@@ -3,7 +3,7 @@
 // ========================
 // 环境配置
 // ========================
-#define ANDROID_ENV 1   // 0: Linux, 1: Android
+#define ANDROID_ENV 0   // 0: Linux, 1: Android
 
 // ========================
 // 日志总开关
@@ -52,3 +52,5 @@
     #endif
 
 #endif
+
+

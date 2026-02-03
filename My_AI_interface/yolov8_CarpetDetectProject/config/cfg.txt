@@ -10,6 +10,7 @@ score_threshold=0.7f
 //检测帧数阈值
 max_frame_threshold=3
 
+//地毯的类别ID，于建图配合，设定地毯目标的重要程度
 CARPET_AREA=60
 
 //相机坐标系：远端Z轴比例缩放

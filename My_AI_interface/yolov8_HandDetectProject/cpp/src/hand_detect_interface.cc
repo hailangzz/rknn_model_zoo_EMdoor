@@ -8,7 +8,6 @@
 #include "image_drawing.h"
 #include "event_control.h"
 #include "logs.h"
-// #include "version.h"
 
 #include <mutex>
 #include <cstdio>    // 用于 snprintf
@@ -38,13 +37,6 @@
 //         } while(0)
 // #endif
 
-
-// void print_version() {
-//     std::cout << "Library Version: " << LIBRARY_VERSION << std::endl;
-//     std::cout << "Build Timestamp: " << BUILD_TIMESTAMP << std::endl;
-// }
-
-
 // ====================== 配置路径 & 读取 ======================
 static std::string& getConfigPath() {
     static std::string config_path = "./config/cfg.txt";  // 默认路径
@@ -59,10 +51,7 @@ static ConfigInfo& getConfig()
 
 void hand_detect_set_config_path(const std::string& path) {
     getConfigPath() = path;
- 
-    // 输出版本号和构建时间戳
-    LOGI("Library Version: %s", LIBRARY_VERSION);
-    LOGI("Build Timestamp: %s", BUILD_TIMESTAMP);
+
 }
 
 // ====================== 单例模块 ======================
@@ -272,4 +261,7 @@ HandDetectResult hand_detect_interface(
     }
 }
 
+void print_version() {
+    std::cout << "version info: HandDetect:1.0.0  2026-02-02_21-56-35"<< std::endl;
+}
 

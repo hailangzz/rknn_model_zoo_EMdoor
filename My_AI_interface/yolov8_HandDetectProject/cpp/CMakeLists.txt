@@ -149,7 +149,7 @@ install(FILES ${RKNN_FILES} DESTINATION model)
 
 
 # # 设置版本号和时间戳
-# set(LIBRARY_VERSION "HandDetect:1.0.0")
+# set(LIBRARY_VERSION "1.0.0")
 # execute_process(COMMAND date "+%Y-%m-%d_%H-%M-%S" OUTPUT_VARIABLE CMAKE_DATE)
 # string(STRIP ${CMAKE_DATE} CMAKE_DATE)
 # set(BUILD_TIMESTAMP "${CMAKE_DATE}")
