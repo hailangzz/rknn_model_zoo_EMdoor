@@ -27,8 +27,9 @@ onnx 模型转rknn:
   编译接口项目
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_HandDetectProject
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_CarpetSegmentProject
 
-
+  
   ./build-android-my-interface.sh -t rk3588 -a arm64-v8a -d yolov8_CarpetDetectProject
 
   ./build-android-my-interface.sh -t rk3568 -a arm64-v8a -d yolov8_HandDetectProject
