@@ -1,0 +1,9 @@
+项目安装、启动方法
+
+1、进入CarpetDetectProject目录；
+
+2、source /opt/ros/noetic/setup.bash
+
+3、编译、安装：catkin_make install
+
+4、启动任务：./install/lib/carpet_detect_subscriber/run.sh
