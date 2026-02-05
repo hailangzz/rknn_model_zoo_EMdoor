@@ -371,8 +371,7 @@ void CarpetDetectNode::rosparamMonitorLoop()
         if (nh_.getParam(infer_enable_param_, param_val))
         {
             infer_enable_ = param_val;
-            // ROS_DEBUG("carpet_detect_enable = %d", infer_enable_);
-            ROS_INFO("carpet_detect_enable = %d", infer_enable_);
+            ROS_DEBUG("carpet_detect_enable = %d", infer_enable_);
         }
         rate.sleep();
     }

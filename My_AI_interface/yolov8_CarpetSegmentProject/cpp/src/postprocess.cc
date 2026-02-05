@@ -842,3 +842,143 @@ void deinit_post_process()
         }
     }
 }
+
+
+void extract_seg_mask_contours(object_detect_result_list &od_results,
+                               int target_index,
+                               int width, int height,
+                               std::vector<std::vector<cv::Point>> &out_contours)
+{
+    if (od_results.count <= target_index)
+        return;
+
+    uint8_t *seg_mask = od_results.results_seg[target_index].seg_mask;
+    if (!seg_mask)
+        return;
+
+    // -----------------------------
+    // 1️⃣ seg_mask → cv::Mat
+    // -----------------------------
+    cv::Mat mask(height, width, CV_8UC1, seg_mask);
+
+    // 二值化（前景 = 非零）
+    cv::Mat bin_mask;
+    cv::threshold(mask, bin_mask, 0, 255, cv::THRESH_BINARY);
+
+    // -----------------------------
+    // 2️⃣ 提取轮廓
+    // -----------------------------
+    std::vector<std::vector<cv::Point>> contours;
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(
+        bin_mask,
+        contours,
+        hierarchy,
+        cv::RETR_EXTERNAL,      // 只提取最外层闭合轮廓
+        cv::CHAIN_APPROX_SIMPLE // 压缩连续点
+    );
+
+    // -----------------------------
+    // 3️⃣ 可选轮廓简化
+    // -----------------------------
+    out_contours.clear();
+    for (const auto &cnt : contours)
+    {
+        std::vector<cv::Point> approx;
+        cv::approxPolyDP(cnt, approx, 2.0, true); // 像素精度 2
+        out_contours.push_back(approx);
+    }
+
+    // -----------------------------
+    // 4️⃣ 释放 mask
+    // -----------------------------
+    free(seg_mask);
+    od_results.results_seg[target_index].seg_mask = nullptr;
+}
+
+inline float estimateDistance(float x,ConfigInfo & config)
+{
+    float polyfit_result;
+    polyfit_result = config.camera_z_axle_top_resize_rate * x;
+    polyfit_result = config.camera_z_axle_polyfit_w0 * x * x + config.camera_z_axle_polyfit_w1 * x + config.camera_z_axle_polyfit_w2;
+    // y = 0.2220 x^2 + 0.8531 x + 0.1568
+    return polyfit_result;
+}
+
+// =========================
+// 将 object_detect_result 填充到 ObjectCameraDetectResult
+// =========================
+void fillCameraDetectResult(
+    const object_detect_result* det,
+    ObjectCameraDetectResult& one,
+    ConfigInfo& config)
+{
+
+    // ---------- 1. 类别 & 置信度 ----------
+    one.prop   = det->prop;
+    one.cls_id = config.CARPET_AREA;
+
+    printf("det->box.top = %d\n", det->box.top);
+    printf("det->box.bottom = %d\n", det->box.bottom);
+    printf("det->box.left = %d\n", det->box.left);
+    printf("det->box.right = %d\n", det->box.right);
+    // ---------- 2. 四个角点 ----------
+    one.coords.clear();
+    one.coords.resize(4);
+
+    one.coords[0].X = det->camera_coordinates.left_top.X;
+    one.coords[0].Y = det->camera_coordinates.left_top.Y;
+    one.coords[0].Z = estimateDistance(det->camera_coordinates.left_top.Z, config);
+
+    one.coords[1].X = det->camera_coordinates.right_top.X;
+    one.coords[1].Y = det->camera_coordinates.right_top.Y;
+    one.coords[1].Z = estimateDistance(det->camera_coordinates.right_top.Z, config);
+
+    one.coords[2].X = det->camera_coordinates.right_bottom.X;
+    one.coords[2].Y = det->camera_coordinates.right_bottom.Y;
+    one.coords[2].Z = estimateDistance(det->camera_coordinates.right_bottom.Z, config);
+
+    one.coords[3].X = det->camera_coordinates.left_bottom.X;
+    one.coords[3].Y = det->camera_coordinates.left_bottom.Y;
+    one.coords[3].Z = estimateDistance(det->camera_coordinates.left_bottom.Z, config);
+
+    // ---------- 3. 目标框 ----------
+    one.target_box.top    = det->box.top;
+    one.target_box.bottom = det->box.bottom;
+    one.target_box.left   = det->box.left;
+    one.target_box.right  = det->box.right;
+    
+    printf("det->box.top = %d\n", det->box.top);
+    printf("det->box.bottom = %d\n", det->box.bottom);
+    printf("det->box.left = %d\n", det->box.left);
+    printf("det->box.right = %d\n", det->box.right);
+
+    printf("Target Box: left=%d, top=%d, right=%d, bottom=%d\n",
+           one.target_box.left,
+           one.target_box.top,
+           one.target_box.right,
+           one.target_box.bottom);
+
+    // ---------- 4. 边缘采样点（按真实数量） ----------
+    one.add_edge_point_single_pixel_camera_coordinates.clear();
+
+    const int edge_num = det->camera_coordinates.add_edge_point_num;
+    const auto* edge_src =
+        det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates;
+
+    if (edge_num <= 0 || edge_src == nullptr) {
+        return;
+    }
+
+    one.add_edge_point_single_pixel_camera_coordinates.resize(edge_num);
+
+    for (int i = 0; i < edge_num; ++i) {
+        const single_pixel_camera_coordinates& src = edge_src[i];
+
+        one.add_edge_point_single_pixel_camera_coordinates[i].X = src.X;
+        one.add_edge_point_single_pixel_camera_coordinates[i].Y = src.Y;
+        one.add_edge_point_single_pixel_camera_coordinates[i].Z =
+            estimateDistance(src.Z, config);
+    }
+    printf("edge_num = %d\n", edge_num);    
+}

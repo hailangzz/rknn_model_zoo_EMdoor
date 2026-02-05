@@ -65,7 +65,8 @@ typedef struct box_camera_coordinates{
     single_pixel_camera_coordinates right_bottom;
     single_pixel_camera_coordinates left_bottom;
 
-    single_pixel_camera_coordinates add_edge_point_single_pixel_camera_coordinates[20]; // 新增边缘点的轮廓像素坐标值
+    single_pixel_camera_coordinates *add_edge_point_single_pixel_camera_coordinates;
+    int add_edge_point_num;
     
 }box_camera_coordinates;
 

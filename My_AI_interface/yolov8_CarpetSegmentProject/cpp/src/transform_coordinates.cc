@@ -164,7 +164,8 @@ bool CameraParameters::pixelToCameraXYZGround(
     camera_coordinates.X = -(t * Xw);
     camera_coordinates.Y = 0.0f;
     camera_coordinates.Z = -(t * Zw);
-
+    // printf("float u_scaled:%f, float v_scaled:%f.\n",u_scaled,v_scaled);
+    // printf("camera_coordinates info is  X:%f,Y:%f,Z:%f.\n",camera_coordinates.X,camera_coordinates.Y,camera_coordinates.Z);
     return true;
 }
 
@@ -333,93 +334,117 @@ bool CameraParameters::XYZGroundTopixel(single_pixel_camera_coordinates P,float 
 // }
 
 
-bool CameraParameters::ObjectboxToCameraXYZ(image_rect_t object_rect, box_camera_coordinates &camera_coordinates){
+bool CameraParameters::ObjectboxToCameraXYZ(
+    object_detect_result* det,
+    const std::vector<std::vector<cv::Point>> &contours_mark_point)
+{
+    if (!det) return false;
 
-        
-    // printf("enter ObjectboxToCameraXYZ: left=%d, top=%d, right=%d, bottom=%d\n",
-    //        object_rect.left, object_rect.top, object_rect.right, object_rect.bottom);
-
-    if (!pixelToCameraXYZGround(object_rect.left, object_rect.top, camera_coordinates.left_top)) {
-        memset(&camera_coordinates.left_top, 0, sizeof(single_pixel_camera_coordinates));
+    printf("%d\n", det->box.left);
+    printf("%d\n", det->box.top);
+    printf("%d\n", det->box.right);
+    printf("%d\n", det->box.bottom);
+    
+    // ---------- 1. 四个角点 ----------
+    if (!pixelToCameraXYZGround(det->box.left, det->box.top, det->camera_coordinates.left_top)) {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for left_top (%d,%d)\n",
-                object_rect.left, object_rect.top);
+                det->box.left, det->box.top);
     }
 
-    if (!pixelToCameraXYZGround(object_rect.right, object_rect.top, camera_coordinates.right_top)) {
-        memset(&camera_coordinates.right_top, 0, sizeof(single_pixel_camera_coordinates));
+    if (!pixelToCameraXYZGround(det->box.right, det->box.top, det->camera_coordinates.right_top)) {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for right_top (%d,%d)\n",
-                object_rect.right, object_rect.top);
+                det->box.right, det->box.top);
     }
-    if (!pixelToCameraXYZGround(object_rect.right, object_rect.bottom, camera_coordinates.right_bottom)) {
-        memset(&camera_coordinates.right_bottom, 0, sizeof(single_pixel_camera_coordinates));
+
+    if (!pixelToCameraXYZGround(det->box.right, det->box.bottom, det->camera_coordinates.right_bottom)) {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for right_bottom (%d,%d)\n",
-                object_rect.right, object_rect.bottom);
+                det->box.right, det->box.bottom);
     }
-    if (!pixelToCameraXYZGround(object_rect.left, object_rect.bottom, camera_coordinates.left_bottom)) {
-        memset(&camera_coordinates.left_bottom, 0, sizeof(single_pixel_camera_coordinates));
+
+    if (!pixelToCameraXYZGround(det->box.left, det->box.bottom, det->camera_coordinates.left_bottom)) {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for left_bottom (%d,%d)\n",
-                object_rect.left, object_rect.bottom);
+                det->box.left, det->box.bottom);
     }
 
+    printf("camera_coordinates info: "
+           "left_top: X:%f,Y:%f,Z:%f, "
+           "right_top: X:%f,Y:%f,Z:%f, "
+           "right_bottom: X:%f,Y:%f,Z:%f, "
+           "left_bottom: X:%f,Y:%f,Z:%f\n",
+           det->camera_coordinates.left_top.X, det->camera_coordinates.left_top.Y, det->camera_coordinates.left_top.Z,
+           det->camera_coordinates.right_top.X, det->camera_coordinates.right_top.Y, det->camera_coordinates.right_top.Z,
+           det->camera_coordinates.right_bottom.X, det->camera_coordinates.right_bottom.Y, det->camera_coordinates.right_bottom.Z,
+           det->camera_coordinates.left_bottom.X, det->camera_coordinates.left_bottom.Y, det->camera_coordinates.left_bottom.Z);
 
-    // ------------------- 固定数组采样 -------------------
-    const int edge_sample_num = 5; // 每条边采样点数量（不含端点）
-    int idx = 0; // 当前数组索引
+    // ---------- 2. 边缘点 ----------
+    // 先清空旧边缘点指针（防止野指针）
+    if (det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates) {
+        free(det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates);
+        det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates = nullptr;
+        det->camera_coordinates.add_edge_point_num = 0;
+    }
 
-    auto sample_edge = [&](int x1, int y1, int x2, int y2) {
-        for (int i = 1; i <= edge_sample_num && idx < 20; ++i) {
-            float t = static_cast<float>(i) / (edge_sample_num + 1);
-            int u = static_cast<int>(x1 + t * (x2 - x1));
-            int v = static_cast<int>(y1 + t * (y2 - y1));
+    // 统计总边缘点数量
+    int total_points = 0;
+    for (const auto &contour : contours_mark_point) total_points += static_cast<int>(contour.size());
+    if (total_points == 0) return true;
 
+    // 分配内存
+    det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates =
+        (single_pixel_camera_coordinates *)malloc(
+            total_points * sizeof(single_pixel_camera_coordinates)
+        );
+    if (!det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates) {
+        fprintf(stderr, "[ERROR] malloc failed for edge points\n");
+        return false;
+    }
+
+    // 填充边缘点
+    det->camera_coordinates.add_edge_point_num = 0;
+    for (const auto &contour : contours_mark_point) {
+        for (const auto &pt : contour) {
             single_pixel_camera_coordinates cam_pt;
-            if (pixelToCameraXYZGround(u, v, cam_pt)) {
-                camera_coordinates.add_edge_point_single_pixel_camera_coordinates[idx++] = cam_pt;
+            if (pixelToCameraXYZGround(pt.x, pt.y, cam_pt)) {
+                det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[
+                    det->camera_coordinates.add_edge_point_num++
+                ] = cam_pt;
             }
         }
-    };
+    }
 
-    //上边
-    sample_edge(object_rect.left, object_rect.top,
-                object_rect.right, object_rect.top);
+    printf("Edge points count: %d\n", det->camera_coordinates.add_edge_point_num);
+    for (int i = 0; i < det->camera_coordinates.add_edge_point_num; ++i) {
+        const auto &p = det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[i];
+        printf("Edge point %d: X:%f Y:%f Z:%f\n", i, p.X, p.Y, p.Z);
+    }
 
-    // 右边
-    sample_edge(object_rect.right, object_rect.top,
-                object_rect.right, object_rect.bottom);
+    // ---------- 3. 打印左下角信息 ----------
+    // const auto &lb = det->camera_coordinates.left_bottom;
+    if (det->camera_coordinates.left_bottom.X != 0 || det->camera_coordinates.left_bottom.Y != 0 || det->camera_coordinates.left_bottom.Z != 0) {
+        printf("Left Bottom: X:%f Y:%f Z:%f\n", det->camera_coordinates.left_bottom.X, det->camera_coordinates.left_bottom.Y, det->camera_coordinates.left_bottom.Z);
+    } else {
+        printf("Left Bottom: invalid\n");
+    }
 
-    // 下边
-    sample_edge(object_rect.right, object_rect.bottom,
-                object_rect.left, object_rect.bottom);
+    if (det->camera_coordinates.right_bottom.X != 0 || det->camera_coordinates.right_bottom.Y != 0 || det->camera_coordinates.right_bottom.Z != 0) {
+        printf("Right Bottom: X:%f Y:%f Z:%f\n", det->camera_coordinates.right_bottom.X, det->camera_coordinates.right_bottom.Y, det->camera_coordinates.right_bottom.Z);
+    } else {
+        printf("Right Bottom: invalid\n");
+    }
 
-    // 左边
-    sample_edge(object_rect.left, object_rect.bottom,
-                object_rect.left, object_rect.top);
+    if (det->camera_coordinates.right_top.X != 0 || det->camera_coordinates.right_top.Y != 0 || det->camera_coordinates.right_top.Z != 0) {
+        printf("Right Top: X:%f Y:%f Z:%f\n", det->camera_coordinates.right_top.X, det->camera_coordinates.right_top.Y, det->camera_coordinates.right_top.Z);
+    } else {
+        printf("Right Top: invalid\n");
+    }
 
-    
-    // // ------------------- 打印 camera_coordinates -------------------
-    // printf("Corner points:\n");  //Z轴为原始尺寸时
-    // printf("  left_top     : X=%.3f, Y=%.3f, Z=%.3f\n",
-    //        camera_coordinates.left_top.X,
-    //        camera_coordinates.left_top.Y,
-    //        camera_coordinates.left_top.Z);
-    // printf("  right_top    : X=%.3f, Y=%.3f, Z=%.3f\n",
-    //        camera_coordinates.right_top.X,
-    //        camera_coordinates.right_top.Y,
-    //        camera_coordinates.right_top.Z);
-    // printf("  right_bottom : X=%.3f, Y=%.3f, Z=%.3f\n",
-    //        camera_coordinates.right_bottom.X,
-    //        camera_coordinates.right_bottom.Y,
-    //        camera_coordinates.right_bottom.Z);
-    // printf("  left_bottom  : X=%.3f, Y=%.3f, Z=%.3f\n",
-    //        camera_coordinates.left_bottom.X,
-    //        camera_coordinates.left_bottom.Y,
-    //        camera_coordinates.left_bottom.Z);
+    if (det->camera_coordinates.left_top.X != 0 || det->camera_coordinates.left_top.Y != 0 || det->camera_coordinates.left_top.Z != 0) {
+        printf("Left Top: X:%f Y:%f Z:%f\n", det->camera_coordinates.left_top.X, det->camera_coordinates.left_top.Y, det->camera_coordinates.left_top.Z);
+    } else {
+        printf("Left Top: invalid\n");
+    }
 
-    // printf("Edge sample points (idx = 0 ~ %d):\n", idx-1);
-    // for (int i = 0; i < idx; ++i) {
-    //     auto& p = camera_coordinates.add_edge_point_single_pixel_camera_coordinates[i];
-    //     printf("  [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
-    // }
+   
 
 
     return true;

@@ -14,7 +14,7 @@ public:
         : fx(config.camera_fx), fy(config.camera_fy), cx(config.camera_cx), cy(config.camera_cy), H(config.camera_H), pitch(config.camera_pitch),
           D_0(config.camera_D_0),D_1(config.camera_D_1),D_2(config.camera_D_2),D_3(config.camera_D_3),D_4(config.camera_D_4),D_5(config.camera_D_5),D_6(config.camera_D_6),D_7(config.camera_D_7){}
 
-    bool ObjectboxToCameraXYZ(image_rect_t object_rect, box_camera_coordinates &camera_coordinates);
+    bool ObjectboxToCameraXYZ(object_detect_result* det, const std::vector<std::vector<cv::Point>> &contours_mark_point);
 
 private:
 

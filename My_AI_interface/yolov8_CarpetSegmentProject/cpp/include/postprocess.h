@@ -11,7 +11,7 @@
 #include "rknn_matmul_api.h"
 #include <sys/time.h>
 #include "easy_timer.h"
-
+#include "carpet_detect_interface.h"
 #define OBJ_NAME_MAX_SIZE 64
 #define OBJ_NUMB_MAX_SIZE 128
 #define OBJ_CLASS_NUM 1
@@ -54,4 +54,12 @@ char *coco_cls_to_name(int cls_id);
 int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results);
 int clamp(float val, int min, int max);
 void deinit_post_process();
+void extract_seg_mask_contours(object_detect_result_list &od_results,
+                               int target_index,
+                               int width, int height,
+                               std::vector<std::vector<cv::Point>> &out_contours);
+
+void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
+
+
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_
