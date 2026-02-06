@@ -220,11 +220,13 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
         ObjectCameraDetectResult one;        
 
         std::vector<std::vector<cv::Point>> contours_mark_point;   // 存储轮廓点集
+        std::vector<std::vector<cv::Point>> contours_mark_point_smoothed;   // 存储轮廓点集（平滑后）
         //获取模型推理，mark轮廓点集数组信息。
         extract_seg_mask_contours(od_results, i, src_image.width, src_image.height, contours_mark_point);
         for (size_t j = 0; j < contours_mark_point.size(); j++)
         {
             printf("Contour %zu, points = %zu\n", j, contours_mark_point[j].size());
+            smoothContour(contours_mark_point[j], contours_mark_point_smoothed[j]);
             for (const auto &pt : contours_mark_point[j])
                 printf("(%d,%d) ", pt.x, pt.y);
             printf("\n");
@@ -232,7 +234,7 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
         
         memset(&det->camera_coordinates, 0, sizeof(box_camera_coordinates)); //初始化
         // 坐标转换 （转换为，原始未矫正的，xyz尺寸值）
-        g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_mark_point);
+        g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_mark_point_smoothed);
         
         // 安全打印
         auto &coord = det->camera_coordinates;

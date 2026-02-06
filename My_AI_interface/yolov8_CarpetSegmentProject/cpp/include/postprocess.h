@@ -58,6 +58,10 @@ void extract_seg_mask_contours(object_detect_result_list &od_results,
                                int target_index,
                                int width, int height,
                                std::vector<std::vector<cv::Point>> &out_contours);
+void smoothContour(
+    const std::vector<cv::Point>& input,
+    std::vector<cv::Point>& output,
+    int win = 3);
 
 void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
 

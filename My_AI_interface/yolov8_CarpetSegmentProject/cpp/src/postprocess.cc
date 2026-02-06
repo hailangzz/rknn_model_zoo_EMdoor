@@ -896,6 +896,36 @@ void extract_seg_mask_contours(object_detect_result_list &od_results,
     od_results.results_seg[target_index].seg_mask = nullptr;
 }
 
+// 对mark区域边缘，做移动平滑，减弱mark检测边缘的锯齿型抖动。
+void smoothContour(
+    const std::vector<cv::Point>& input,
+    std::vector<cv::Point>& output,
+    int win)
+{
+    output.clear();
+    int n = input.size();
+    if (n < win) {
+        output = input;
+        return;
+    }
+
+    for (int i = 0; i < n; ++i) {
+        int count = 0;
+        float sx = 0, sy = 0;
+        for (int k = -win/2; k <= win/2; ++k) {
+            int idx = (i + k + n) % n;  // 闭合轮廓
+            sx += input[idx].x;
+            sy += input[idx].y;
+            count++;
+        }
+        output.emplace_back(
+            static_cast<int>(sx / count),
+            static_cast<int>(sy / count)
+        );
+    }
+}
+
+
 inline float estimateDistance(float x,ConfigInfo & config)
 {
     float polyfit_result;
