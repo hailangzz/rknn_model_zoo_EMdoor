@@ -103,31 +103,42 @@ void NV12ToNV21(const uint8_t* nv12, int width, int height, uint8_t* nv21)
 }
 
 
-bool ConvertImageBufferToRGB(const image_buffer_t& src, LinuxImageRGB888& dst)
+
+void PrintHandDetectResult(HandDetectResult result)
 {
-    // 1. 检查输入
+    switch(result)
+    {
+        case HandDetectResult::Processing:  std::cout << "Processing"; break;
+        case HandDetectResult::NoHand:      std::cout << "NoHand"; break;
+        case HandDetectResult::HandDetected: std::cout << "HandDetected"; break;
+        default: std::cout << "Unknown"; break;
+    }
+}
+
+bool ConvertImageBufferToRGB(const image_buffer_t& src,
+                             std::shared_ptr<cv::Mat>& mat_image_input)
+{
+    // 1️⃣ 检查输入
     if (!src.virt_addr || src.width <= 0 || src.height <= 0) {
         return false;
     }
 
     int width  = src.width;
     int height = src.height;
-    int image_size = width * height * 3;  // RGB888
 
-    // 2. 分配 RGB 缓冲区
-    dst.image_input_rgb888 = new uint8_t[image_size];
-    if (!dst.image_input_rgb888) return false;
+    // 2️⃣ 创建 Mat（RGB888 → CV_8UC3）
+    mat_image_input = std::make_shared<cv::Mat>(height, width, CV_8UC3);
+    if (!mat_image_input || mat_image_input->empty()) {
+        return false;
+    }
 
-    dst.image_width  = width;
-    dst.image_height = height;
-
-    uint8_t* rgb = dst.image_input_rgb888;
+    uint8_t* rgb = mat_image_input->data;
 
     switch (src.format)
     {
         case IMAGE_FORMAT_GRAY8:
         {
-            // 灰度 → RGB (R=G=B=gray)
+            // Gray → RGB
             for (int i = 0; i < width * height; ++i) {
                 uint8_t gray = src.virt_addr[i];
                 rgb[i * 3 + 0] = gray;
@@ -140,7 +151,7 @@ bool ConvertImageBufferToRGB(const image_buffer_t& src, LinuxImageRGB888& dst)
         case IMAGE_FORMAT_RGB888:
         {
             // 直接拷贝
-            memcpy(rgb, src.virt_addr, image_size);
+            memcpy(rgb, src.virt_addr, width * height * 3);
             break;
         }
 
@@ -157,26 +168,13 @@ bool ConvertImageBufferToRGB(const image_buffer_t& src, LinuxImageRGB888& dst)
         }
 
         default:
-            delete[] dst.image_input_rgb888;
-            dst.image_input_rgb888 = nullptr;
+            mat_image_input.reset();
             return false;
     }
 
     return true;
 }
 
-
-
-void PrintHandDetectResult(HandDetectResult result)
-{
-    switch(result)
-    {
-        case HandDetectResult::Processing:  std::cout << "Processing"; break;
-        case HandDetectResult::NoHand:      std::cout << "NoHand"; break;
-        case HandDetectResult::HandDetected: std::cout << "HandDetected"; break;
-        default: std::cout << "Unknown"; break;
-    }
-}
 /*-------------------------------------------
                   Main Function
 -------------------------------------------*/
@@ -194,12 +192,21 @@ int main(int argc, char **argv)
     int ret = read_image(image_path.c_str(), &src_image);
     // write_image("origin.png", &src_image);
 
-    LinuxImageRGB888 image_input;
-    ConvertImageBufferToRGB(src_image, image_input);
-    // write_image("ConvertImageBufferToRGB.png", &image_input);
+    std::shared_ptr<cv::Mat> mat_img;
+    if (!ConvertImageBufferToRGB(src_image, mat_img)) {
+        std::cerr << "Convert failed\n";
+        return -1;
+    }
 
-    bool is_save_images = true;
-    HandDetectResult results = hand_detect_interface(&image_input,is_save_images);
+    if (mat_img->empty()) {
+        std::cerr << "❌ Failed to read image\n";
+        return -1;
+    }
+
+    // 转换为 RGB
+    // auto img_rgb = std::make_shared<cv::Mat>();
+    // cv::cvtColor(*mat_img, *img_rgb, cv::COLOR_BGR2RGB);
+    HandDetectResult results = hand_detect_interface(mat_img, true);
     
     std::cout << "HandDetect result: ";
     PrintHandDetectResult(results);
@@ -217,12 +224,6 @@ int main(int argc, char **argv)
     rknn_app_ctx.img_dma_buf.size = src_image.size;
 #endif
     
-    if (ret != 0)
-    {
-        printf("read image fail! ret=%d image_path=%s\n", ret, image_path.c_str());
-        goto out;
-    }
-
     object_detect_result_list od_results;
 
     // 计算耗时
@@ -267,18 +268,6 @@ int main(int argc, char **argv)
 
 out:
     deinit_post_process();
-
-    if (src_image.virt_addr != NULL)
-    {
-#if defined(RV1106_1103) 
-        dma_buf_free(rknn_app_ctx.img_dma_buf.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd, 
-                rknn_app_ctx.img_dma_buf.dma_buf_virt_addr);
-#else
-        
-        free(src_image.virt_addr);
-        
-#endif
-    }
 
     return 0;
 }

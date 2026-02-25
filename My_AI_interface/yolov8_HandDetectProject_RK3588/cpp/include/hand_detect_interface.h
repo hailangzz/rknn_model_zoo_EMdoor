@@ -1,25 +1,18 @@
 #pragma once
+
+#include <memory>
+#include <string>
 #include <opencv2/opencv.hpp>
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-struct LinuxImageRGB888 {
-    uint8_t* image_input_rgb888;   // RGB888 数据
-    int image_width;
-    int image_height;
-};
-
+// ================= 检测结果 =================
 enum class HandDetectResult {
     Processing,   // 上一帧还未处理完成
-    NoHand,       // 本帧处理完成，没有检测到手 
+    NoHand,       // 本帧处理完成，没有检测到手
     HandDetected  // 本帧处理完成，检测到手
 };
 
+// ================= 配置接口 =================
 void hand_detect_set_config_path(const std::string& path);
-// 目标检测接口（使用指针，更兼容 C/JNI）
-HandDetectResult hand_detect_interface(LinuxImageRGB888* image_object_input, bool is_save_images);
 
-#ifdef __cplusplus
-}
-#endif
+// ================= 推荐主接口（OpenCV Mat 共享指针） =================
+HandDetectResult hand_detect_interface(std::shared_ptr<cv::Mat> image_object_input,bool is_save_images); 
