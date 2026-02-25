@@ -37,7 +37,7 @@ axes_h=200
 //axes_h=315
 
 //手势目标框与货架平台，重叠区域占目标框比例阈值
-target_effective_area_iou_thread=0.5 
+target_effective_area_iou_thread=0.5
 
 //检测到手部目标，最大的持续时长（大于持续持续时长后，屏蔽block_duration_s秒）
 max_detect_duration_s=180.0

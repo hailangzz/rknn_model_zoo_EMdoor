@@ -1,0 +1,32 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+//linuxs
+model_path=./model/hand_f_v3.rknn
+labels_info=./model/labels_list.txt
+
+
+input_width=416
+input_height=416
+score_threshold=0.7f
+
+//检测帧数阈值
+max_frame_threshold=1
+
+//linuxs
+debug_nv21_image_saver=/home/robot/zhangzhuo/result_images
+
+//椭圆区域有效区域：1280*720
+center_x=540
+center_y=337
+axes_w=290
+axes_h=300
+
+
+//手势目标框与货架平台，重叠区域占目标框比例阈值
+target_effective_area_iou_thread=0.5
+
+//检测到手部目标，最大的持续时长（大于持续持续时长后，屏蔽block_duration_s秒）
+max_detect_duration_s=180.0
+block_duration_s=3.0
