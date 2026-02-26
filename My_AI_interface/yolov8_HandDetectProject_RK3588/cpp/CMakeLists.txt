@@ -142,6 +142,8 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/hand.jpg DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/labels_list.txt DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../config/cfg.txt DESTINATION config)
 
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/hand_detect_interface.h DESTINATION include)
+
 file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
 install(FILES ${RKNN_FILES} DESTINATION model)
 

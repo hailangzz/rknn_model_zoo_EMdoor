@@ -22,8 +22,30 @@ ConfigInfo readConfig(const std::string& filename) {
         }
     }
 
-    cfg_values.model_path  = config["model_path"].c_str(); 
-    cfg_values.labels_info  = config["labels_info"].c_str(); 
+    // ===== 提取 config/cfg.txt 之前的路径 =====
+    std::string base_path = filename;
+    std::string key = "config/cfg.txt";
+    size_t pos = base_path.find(key);
+
+    if (pos != std::string::npos) {
+        base_path = base_path.substr(0, pos);
+    } else {
+        // 如果没找到 config/cfg.txt，则取父目录
+        size_t last_slash = base_path.find_last_of("/\\");
+        if (last_slash != std::string::npos) {
+            base_path = base_path.substr(0, last_slash + 1);
+        } else {
+            base_path = "";
+        }
+    }
+
+    // ===== 拼接 model_path =====
+    cfg_values.model_path = base_path + config["model_path"];
+    cfg_values.labels_info  = base_path + config["labels_info"];
+
+    // cfg_values.model_path  = config["model_path"].c_str(); 
+    // cfg_values.labels_info  = config["labels_info"].c_str(); 
+
     cfg_values.input_width  = std::stoi(config["input_width"]);  
     cfg_values.input_height  = std::stoi(config["input_height"]);  
     

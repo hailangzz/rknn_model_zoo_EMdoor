@@ -17,3 +17,6 @@ onnx 模型转rknn:
 
 板端程序测试：
 ./rknn_yolov8_demo model/WireDetectModel.rknn model/wire.jpg
+
+克隆公司代码仓库中，手势识别分支包
+git clone -b feat/hand_detect_RK3588 ssh://git@172.16.50.250:222/algorithm/ai_detection.git
