@@ -341,7 +341,6 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     }
 
     // Run
-    printf("rknn_run\n");
     ret = rknn_run(rknn_app_ctx_.rknn_ctx, nullptr);
     if (ret < 0)
     {

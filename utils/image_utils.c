@@ -270,8 +270,7 @@ int write_image(const char* path, const image_buffer_t* img)
     int height = img->height;
     int channel = 3;
     void* data = img->virt_addr;
-    printf("write_image path: %s width=%d height=%d channel=%d data=%p\n",
-        path, width, height, channel, data);
+    // printf("write_image path: %s width=%d height=%d channel=%d data=%p\n",path, width, height, channel, data);
 
     const char* _ext = strrchr(path, '.');
     if (!_ext) {

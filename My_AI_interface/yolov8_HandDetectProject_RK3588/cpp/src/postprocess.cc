@@ -716,7 +716,7 @@ bool bboxEllipseOverlapRatio(
     int samples)
 {
 
-    printf("bboxEllipseOverlapRatio begin!!");
+    // printf("bboxEllipseOverlapRatio begin!!");
     int inside_count = 0;
     int total_count = samples * samples;
 

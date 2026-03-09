@@ -6,6 +6,8 @@ rosparam get /task_manager/carpet_inspection_enable
 
 rosparam set /task_manager/carpet_inspection_enable true
 
+#rosparam set /task_manager/carpet_inspection_enable false
+
 source devel/setup.bash
 
 rosrun carpet_detect_subscriber carpet_detect_listener
