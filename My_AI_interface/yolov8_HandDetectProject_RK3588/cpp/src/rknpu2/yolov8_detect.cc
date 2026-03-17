@@ -58,6 +58,7 @@ ConfigInfo readConfig(const std::string& filename) {
     cfg_values.axes_w  = std::stoi(config["axes_w"]);
     cfg_values.axes_h  = std::stoi(config["axes_h"]);
     cfg_values.target_effective_area_iou_thread = std::stof(config["target_effective_area_iou_thread"]);
+    cfg_values.target_bbox_center_box_area_threshold = std::stof(config["target_bbox_center_box_area_threshold"]);
     cfg_values.max_detect_duration_s  = std::stof(config["max_detect_duration_s"]);
     cfg_values.block_duration_s  = std::stof(config["block_duration_s"]);
 

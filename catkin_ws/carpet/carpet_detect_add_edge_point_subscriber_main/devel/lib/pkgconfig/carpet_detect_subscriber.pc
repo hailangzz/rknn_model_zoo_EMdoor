@@ -1,0 +1,8 @@
+prefix=/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/devel
+
+Name: carpet_detect_subscriber
+Description: Description of carpet_detect_subscriber
+Version: 0.0.1
+Cflags: -I/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/src/carpet_detect_subscriber/include
+Libs: -L${prefix}/lib -lrknn_carpet_detect
+Requires: roscpp std_msgs sensor_msgs cv_bridge carpet_detect_msgs

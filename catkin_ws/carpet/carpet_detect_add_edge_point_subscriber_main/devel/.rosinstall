@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/carpet_detect_add_edge_point_subscriber_main/devel/setup.sh

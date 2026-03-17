@@ -39,7 +39,7 @@ char *coco_cls_to_name(int cls_id);
 int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results);
 void deinit_post_process();
 inline bool pointInEllipse(float x, float y,float cx, float cy,float a, float b);
-bool bboxEllipseOverlapRatio(int x1, int y1, int x2, int y2,int center_x, int center_y,int axes_w, int axes_h,float threshold,int samples = 20);   // samples采样密度，20~30 通常够用
+bool bboxEllipseOverlapRatio(int x1, int y1, int x2, int y2,int center_x, int center_y,int axes_w, int axes_h,float threshold,float bbox_area_threshold,int samples = 20);   // samples采样密度，20~30 通常够用
 
 
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_

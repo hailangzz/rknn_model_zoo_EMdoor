@@ -47,6 +47,7 @@ struct ConfigInfo {
     int axes_w;
     int axes_h;
     float target_effective_area_iou_thread;
+    float target_bbox_center_box_area_threshold;
     float max_detect_duration_s;  
     float block_duration_s;    
     

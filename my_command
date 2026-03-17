@@ -18,6 +18,9 @@ onnx 模型转rknn:
 
   ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_WireDetect
 
+  ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_liquid_detect
+
+
   ./build-linux-my-program.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
 
   编译yolov8_seg项目
@@ -29,10 +32,11 @@ onnx 模型转rknn:
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_HandDetectProject
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_CarpetSegmentProject
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_HandDetectProject_RK3588
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_wireSegmentProject
+
 
   
   ./build-android-my-interface.sh -t rk3588 -a arm64-v8a -d yolov8_CarpetDetectProject
-
   ./build-android-my-interface.sh -t rk3568 -a arm64-v8a -d yolov8_HandDetectProject
 
 

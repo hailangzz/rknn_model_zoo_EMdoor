@@ -229,42 +229,42 @@ int main(int argc, char **argv)
     // 计算耗时
     gettimeofday(&start_time, NULL);
 
-    // ret = detector.inference_yolov8_model(&src_image, &od_results);
-    // if (ret != 0)
-    // {
-    //     printf("init_yolov8_model fail! ret=%d\n", ret);
-    //     goto out;
-    // }
+    ret = detector.inference_yolov8_model(&src_image, &od_results);
+    if (ret != 0)
+    {
+        printf("init_yolov8_model fail! ret=%d\n", ret);
+        goto out;
+    }
 
-    // gettimeofday(&stop_time, NULL);
-    // printf("once run use %f ms\n", (__get_us(stop_time) - __get_us(start_time)) / 1000);
+    gettimeofday(&stop_time, NULL);
+    printf("once run use %f ms\n", (__get_us(stop_time) - __get_us(start_time)) / 1000);
     
-    // // 画框和概率
-    // char text[256];
-    // for (int i = 0; i < od_results.count; i++)
-    // {
-    //     object_detect_result *det_result = &(od_results.results[i]);
-    //     printf("%s @ (%d %d %d %d) %.3f\n", coco_cls_to_name(det_result->cls_id),
-    //            det_result->box.left, det_result->box.top,
-    //            det_result->box.right, det_result->box.bottom,
-    //            det_result->prop);
+    // 画框和概率
+    char text[256];
+    for (int i = 0; i < od_results.count; i++)
+    {
+        object_detect_result *det_result = &(od_results.results[i]);
+        printf("%s @ (%d %d %d %d) %.3f\n", coco_cls_to_name(det_result->cls_id),
+               det_result->box.left, det_result->box.top,
+               det_result->box.right, det_result->box.bottom,
+               det_result->prop);
         
-    //     int x1 = det_result->box.left;
-    //     int y1 = det_result->box.top;
-    //     int x2 = det_result->box.right;
-    //     int y2 = det_result->box.bottom;
+        int x1 = det_result->box.left;
+        int y1 = det_result->box.top;
+        int x2 = det_result->box.right;
+        int y2 = det_result->box.bottom;
 
-    //     draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
+        draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
         
-    //     printf("finish draw_rectangle!!!!! \n");
-    //     // camera_parameters.ObjectboxToCameraXYZ(od_results.results[i].box, od_results.results[i].camera_coordinates);
-    //     camera_parameters.ObjectboxToCameraXYZ(det_result->box, det_result->camera_coordinates);
+        printf("finish draw_rectangle!!!!! \n");
+        // camera_parameters.ObjectboxToCameraXYZ(od_results.results[i].box, od_results.results[i].camera_coordinates);
+        // camera_parameters.ObjectboxToCameraXYZ(det_result->box, det_result->camera_coordinates);
 
-    //     sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
-    //     draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-    // }
+        sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
+        draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
+    }
 
-    // write_image("out.png", &src_image);
+    write_image("out.png", &src_image);
 
 out:
     deinit_post_process();

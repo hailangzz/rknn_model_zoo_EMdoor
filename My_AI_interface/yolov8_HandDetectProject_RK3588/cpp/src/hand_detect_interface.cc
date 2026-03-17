@@ -123,6 +123,7 @@ HandDetectResult hand_detect_interface(
                     getConfig().axes_w,
                     getConfig().axes_h,
                     getConfig().target_effective_area_iou_thread,
+                    getConfig().target_bbox_center_box_area_threshold,
                     20
                 );
 

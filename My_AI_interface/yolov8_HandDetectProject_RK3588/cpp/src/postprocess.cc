@@ -713,8 +713,26 @@ bool bboxEllipseOverlapRatio(
     int center_x, int center_y,
     int axes_w, int axes_h,
     float threshold,
+    float target_bbox_center_box_area_threshold,
     int samples)
 {
+
+    // 计算 bbox 像素面积
+    int bbox_area = (x2 - x1) * (y2 - y1);
+
+    // 计算以 center_x*2, center_y*2 构成的矩形面积
+    int center_box_area = (center_x * 2) * (center_y * 2);
+
+    // 计算面积比值
+    float area_ratio = static_cast<float>(bbox_area) / center_box_area;
+    
+    // 如果面积比值大于阈值，直接返回 true
+    if (area_ratio >= target_bbox_center_box_area_threshold)
+    {
+        LOGI("bboxEllipseOverlapRatio: bbox_area=%d, center_box_area=%d, area_ratio=%.4f >= target_bbox_center_box_area_threshold=%.4f -> True",
+             bbox_area, center_box_area, area_ratio, target_bbox_center_box_area_threshold);
+        return true;
+    }
 
     // printf("bboxEllipseOverlapRatio begin!!");
     int inside_count = 0;
