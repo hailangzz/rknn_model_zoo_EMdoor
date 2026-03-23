@@ -24,7 +24,11 @@
 
 
 
+  source /opt/ros/noetic/setup.bash
+  rosparam get /task_manager/wire_inspection_enable
+  rosparam set /task_manager/wire_inspection_enable true
   --------------------------------------------------------------------------------------------------------
+
 shell命令行：
 
 cd /home/robot/zhangzhuo/catkin_wc
