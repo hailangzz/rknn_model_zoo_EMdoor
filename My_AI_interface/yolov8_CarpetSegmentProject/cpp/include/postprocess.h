@@ -65,5 +65,6 @@ void smoothContour(
 
 void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
 
+void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours,std::vector<std::vector<cv::Point>> &output_contours);
 
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_

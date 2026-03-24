@@ -228,6 +228,25 @@ void CarpetDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Ob
         );
 
         // ================================
+        // 【新增】1.1 绘制 mark 轮廓区域
+        // ================================
+        for (const auto& contour : r.object_contours_mark_point)
+        {
+            if (contour.empty()) continue;
+
+            std::vector<std::vector<cv::Point>> draw_contours;
+            draw_contours.push_back(contour);
+
+            cv::drawContours(
+                debug_img,
+                draw_contours,
+                -1,
+                cv::Scalar(0, 0, 255),  // 红色轮廓
+                2
+            );
+        }
+
+        // ================================
         // 2. 画类别 + 置信度
         // ================================
         char text[64];

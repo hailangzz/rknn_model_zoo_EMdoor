@@ -220,38 +220,70 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
         ObjectCameraDetectResult one;        
 
         std::vector<std::vector<cv::Point>> contours_mark_point;   // 存储轮廓点集
+        std::vector<std::vector<cv::Point>> contours_mark_point_filtered;   // 存储过滤后的轮廓点集
         std::vector<std::vector<cv::Point>> contours_mark_point_smoothed;   // 存储轮廓点集（平滑后）
         //获取模型推理，mark轮廓点集数组信息。
         extract_seg_mask_contours(od_results, i, src_image.width, src_image.height, contours_mark_point);
-        for (size_t j = 0; j < contours_mark_point.size(); j++)
+        filter_mask_contours(contours_mark_point, contours_mark_point_filtered);
+        // one.object_contours_mark_point = contours_mark_point;     // 边界点数组赋值
+
+        contours_mark_point_smoothed.resize(contours_mark_point_filtered.size());   // 防止数组越界
+        for (size_t j = 0; j < contours_mark_point_filtered.size(); j++)
         {
-            printf("Contour %zu, points = %zu\n", j, contours_mark_point[j].size());
-            smoothContour(contours_mark_point[j], contours_mark_point_smoothed[j]);
-            for (const auto &pt : contours_mark_point[j])
-                printf("(%d,%d) ", pt.x, pt.y);
-            printf("\n");
+            smoothContour(contours_mark_point_filtered[j], contours_mark_point_smoothed[j]);
         }
+        // for (size_t j = 0; j < contours_mark_point.size(); j++)
+        // {
+        //     printf("Contour %zu, points = %zu\n", j, contours_mark_point[j].size());
+        //     smoothContour(contours_mark_point[j], contours_mark_point_smoothed[j]);
+        //     for (const auto &pt : contours_mark_point[j])
+        //         printf("(%d,%d) ", pt.x, pt.y);
+        //     printf("\n");
+        // }
+
+        // // 👉 找最大轮廓
+        // int max_idx = -1;
+        // size_t max_size = 0;
+        // for (size_t j = 0; j < contours_mark_point_smoothed.size(); j++)
+        // {
+        //     if (contours_mark_point_smoothed[j].size() > max_size)
+        //     {
+        //         max_size = contours_mark_point_smoothed[j].size();
+        //         max_idx = j;
+        //     }
+        // }
+        // // 👉 只保留最大轮廓
+        // std::vector<std::vector<cv::Point>> final_contours;
+        // if (max_idx != -1)
+        // {
+        //     final_contours.push_back(contours_mark_point_smoothed[max_idx]);
+        // }
+        // // 👉 用于 3D
+        // g_ctx.camera_params->ObjectboxToCameraXYZ(det, final_contours);
+
+        // 👉 存储
+        one.object_contours_mark_point = contours_mark_point;
         
         memset(&det->camera_coordinates, 0, sizeof(box_camera_coordinates)); //初始化
         // 坐标转换 （转换为，原始未矫正的，xyz尺寸值）
         g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_mark_point_smoothed);
         
         // 安全打印
-        auto &coord = det->camera_coordinates;
-        printf("Left Bottom: X=%f Y=%f Z=%f\n",
-            coord.left_bottom.X, coord.left_bottom.Y, coord.left_bottom.Z);
-        printf("Right Bottom: X=%f Y=%f Z=%f\n",
-            coord.right_bottom.X, coord.right_bottom.Y, coord.right_bottom.Z);
-        printf("Right Top: X=%f Y=%f Z=%f\n",
-            coord.right_top.X, coord.right_top.Y, coord.right_top.Z);
-        printf("Left Top: X=%f Y=%f Z=%f\n",
-            coord.left_top.X, coord.left_top.Y, coord.left_top.Z);
-        printf("%d\n", det->box.left);
-        printf("%d\n", det->box.top);
-        printf("%d\n", det->box.right);
-        printf("%d\n", det->box.bottom);
+        // auto &coord = det->camera_coordinates;
+        // printf("Left Bottom: X=%f Y=%f Z=%f\n",
+        //     coord.left_bottom.X, coord.left_bottom.Y, coord.left_bottom.Z);
+        // printf("Right Bottom: X=%f Y=%f Z=%f\n",
+        //     coord.right_bottom.X, coord.right_bottom.Y, coord.right_bottom.Z);
+        // printf("Right Top: X=%f Y=%f Z=%f\n",
+        //     coord.right_top.X, coord.right_top.Y, coord.right_top.Z);
+        // printf("Left Top: X=%f Y=%f Z=%f\n",
+        //     coord.left_top.X, coord.left_top.Y, coord.left_top.Z);
+        // printf("%d\n", det->box.left);
+        // printf("%d\n", det->box.top);
+        // printf("%d\n", det->box.right);
+        // printf("%d\n", det->box.bottom);
         
-        fillCameraDetectResult(det, one, g_ctx.config);
+        fillCameraDetectResult(det, one, g_ctx.config); // 结果值填充
 
         results.push_back(one); 
 

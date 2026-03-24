@@ -1012,3 +1012,71 @@ void fillCameraDetectResult(
     }
     printf("edge_num = %d\n", edge_num);    
 }
+
+void filter_mask_contours(
+    const std::vector<std::vector<cv::Point>> &input_contours, // 输入：原始轮廓集合（来自mask）
+    std::vector<std::vector<cv::Point>> &output_contours)      // 输出：过滤+平滑后的轮廓
+{
+    output_contours.clear(); // 先清空输出
+
+    // 遍历每一个轮廓
+    for (const auto &cnt : input_contours)
+    {
+        // -----------------------------
+        // 1️⃣ 面积过滤（最关键）
+        // -----------------------------
+        // 作用：去除小噪点 / 小碎片（YOLOv8 seg常见问题）
+        double area = cv::contourArea(cnt);
+        if (area < 200)   // ⚠️ 可调参数：建议根据分辨率调 (100~1000)
+            continue;
+
+        // -----------------------------
+        // 2️⃣ 外接矩形 + 长宽比过滤
+        // -----------------------------
+        // 获取最小外接矩形
+        cv::Rect rect = cv::boundingRect(cnt);
+
+        // 长宽比 = 宽 / 高
+        float aspect_ratio = (float)rect.width / rect.height;
+
+        // 作用：过滤异常细长的区域（如边缘噪声、电线误检等）
+        if (aspect_ratio > 10.0 || aspect_ratio < 0.1)
+            continue;
+
+        // -----------------------------
+        // 3️⃣ 周长过滤
+        // -----------------------------
+        // 计算轮廓周长（闭合）
+        double perimeter = cv::arcLength(cnt, true);
+
+        // 作用：进一步过滤过小或不规则轮廓
+        if (perimeter < 50)   // ⚠️ 可调参数
+            continue;
+
+        // -----------------------------
+        // 4️⃣ 填充率过滤（非常重要）
+        // -----------------------------
+        // 填充率 = 实际面积 / 外接矩形面积
+        float fill_ratio = area / (rect.width * rect.height + 1e-5);
+
+        // 作用：
+        // - 过滤“很空”的区域（例如细线、噪声、破碎mask）
+        // - 对扫地机器人识别电线特别有效
+        if (fill_ratio < 0.2)   // ⚠️ 可调参数（0.1~0.5）
+            continue;
+
+        // -----------------------------
+        // 5️⃣ 轮廓平滑（多边形逼近）
+        // -----------------------------
+        // 作用：
+        // - 减少轮廓点数量
+        // - 提高稳定性（便于后续路径规划/避障）
+        std::vector<cv::Point> approx;
+        cv::approxPolyDP(cnt, approx, 2.0, true); // 2.0 = 平滑精度（越大越平滑）
+
+        // -----------------------------
+        // 6️⃣ 保存结果
+        // -----------------------------
+        output_contours.push_back(approx);
+    }
+}
