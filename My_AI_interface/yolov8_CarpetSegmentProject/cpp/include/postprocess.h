@@ -54,10 +54,17 @@ char *coco_cls_to_name(int cls_id);
 int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results);
 int clamp(float val, int min, int max);
 void deinit_post_process();
-void extract_seg_mask_contours(object_detect_result_list &od_results,
-                               int target_index,
-                               int width, int height,
-                               std::vector<std::vector<cv::Point>> &out_contours);
+// void extract_seg_mask_contours(object_detect_result_list &od_results,
+//                                int target_index,
+//                                int width, int height,
+//                                std::vector<std::vector<cv::Point>> &out_contours);
+
+void extract_seg_mask_contours(
+    object_segment_result* seg,       // 只操作单个目标的 seg_mask
+    int width,
+    int height,
+    std::vector<std::vector<cv::Point>> &out_contours);
+
 void smoothContour(
     const std::vector<cv::Point>& input,
     std::vector<cv::Point>& output,
