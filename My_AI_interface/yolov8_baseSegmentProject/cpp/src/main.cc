@@ -25,7 +25,7 @@
 // #include "file_utils.h"
 #include "image_drawing.h"
 #include "transform_coordinates.h"
-// #include "carpet_detect_interface.h"
+// #include "base_detect_interface.h"
 
 #if defined(RV1106_1103) 
     #include "dma_alloc.hpp"
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     CameraParameters camera_parameters(config_info);
 
 
-    std::string image_path = "./model/wire.jpg";
+    std::string image_path = "./model/carpet.jpg";
     image_buffer_t src_image;
     memset(&src_image, 0, sizeof(image_buffer_t));
     int ret = read_image(image_path.c_str(), &src_image);

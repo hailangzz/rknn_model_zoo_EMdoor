@@ -611,9 +611,205 @@ static int process_fp32(rknn_output *all_input, int input_id, int grid_h, int gr
     return validCount;
 }
 
-int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
-{
+// int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
+// {
 
+//     std::vector<float> filterBoxes;
+//     std::vector<float> objProbs;
+//     std::vector<int> classId;
+
+//     std::vector<float> filterSegments;
+//     float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
+//     std::vector<float> filterSegments_by_nms;
+
+//     int model_in_width = app_ctx->model_width;
+//     int model_in_height = app_ctx->model_height;
+
+//     int validCount = 0;
+//     int stride = 0;
+//     int grid_h = 0;
+//     int grid_w = 0;
+
+//     memset(od_results, 0, sizeof(object_detect_result_list));
+
+//     int dfl_len = app_ctx->output_attrs[0].dims[1] / 4;
+//     int output_per_branch = app_ctx->io_num.n_output / 3; // default 3 branch
+
+//     // process the outputs of rknn
+//     for (int i = 0; i < 13; i++)
+//     {
+//         grid_h = app_ctx->output_attrs[i].dims[2];
+//         grid_w = app_ctx->output_attrs[i].dims[3];
+//         stride = model_in_height / grid_h;
+
+//         if (app_ctx->is_quant)
+//         {
+//             validCount += process_i8(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
+//                                      classId, conf_threshold, app_ctx);
+//         }
+//         else
+//         {
+//             validCount += process_fp32(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
+//                                        classId, conf_threshold);
+//         }
+//     }
+
+//     // nms
+//     if (validCount <= 0)
+//     {
+//         return 0;
+//     }
+//     std::vector<int> indexArray;
+//     for (int i = 0; i < validCount; ++i)
+//     {
+//         indexArray.push_back(i);
+//     }
+
+//     quick_sort_indice_inverse(objProbs, 0, validCount - 1, indexArray);
+
+//     std::set<int> class_set(std::begin(classId), std::end(classId));
+
+//     for (auto c : class_set)
+//     {
+//         nms(validCount, filterBoxes, classId, indexArray, c, nms_threshold);
+//     }
+
+//     int last_count = 0;
+//     od_results->count = 0;
+
+//     for (int i = 0; i < validCount; ++i)
+//     {
+//         if (indexArray[i] == -1 || last_count >= OBJ_NUMB_MAX_SIZE)
+//         {
+//             continue;
+//         }
+//         int n = indexArray[i];
+
+//         float x1 = filterBoxes[n * 4 + 0];
+//         float y1 = filterBoxes[n * 4 + 1];
+//         float x2 = x1 + filterBoxes[n * 4 + 2];
+//         float y2 = y1 + filterBoxes[n * 4 + 3];
+//         int id = classId[n];
+//         float obj_conf = objProbs[i];
+
+//         for (int k = 0; k < PROTO_CHANNEL; k++)
+//         {
+//             filterSegments_by_nms.push_back(filterSegments[n * PROTO_CHANNEL + k]);
+//         }
+
+//         od_results->results[last_count].box.left = x1;
+//         od_results->results[last_count].box.top = y1;
+//         od_results->results[last_count].box.right = x2;
+//         od_results->results[last_count].box.bottom = y2;
+
+//         od_results->results[last_count].prop = obj_conf;
+//         od_results->results[last_count].cls_id = id;
+//         last_count++;
+//     }
+//     od_results->count = last_count;
+//     int boxes_num = od_results->count;
+
+//     float filterBoxes_by_nms[boxes_num * 4];
+//     int cls_id[boxes_num];
+//     for (int i = 0; i < boxes_num; i++)
+//     {
+//         // for crop_mask
+//         filterBoxes_by_nms[i * 4 + 0] = od_results->results[i].box.left;   // x1;
+//         filterBoxes_by_nms[i * 4 + 1] = od_results->results[i].box.top;    // y1;
+//         filterBoxes_by_nms[i * 4 + 2] = od_results->results[i].box.right;  // x2;
+//         filterBoxes_by_nms[i * 4 + 3] = od_results->results[i].box.bottom; // y2;
+//         cls_id[i] = od_results->results[i].cls_id;
+
+//         // get real box
+//         od_results->results[i].box.left = box_reverse(od_results->results[i].box.left, model_in_width, letter_box->x_pad, letter_box->scale);
+//         od_results->results[i].box.top = box_reverse(od_results->results[i].box.top, model_in_height, letter_box->y_pad, letter_box->scale);
+//         od_results->results[i].box.right = box_reverse(od_results->results[i].box.right, model_in_width, letter_box->x_pad, letter_box->scale);
+//         od_results->results[i].box.bottom = box_reverse(od_results->results[i].box.bottom, model_in_height, letter_box->y_pad, letter_box->scale);
+//     }
+
+//     TIMER timer;
+// #ifdef USE_FP_RESIZE
+//     timer.tik();
+//     // compute the mask through Matmul
+//     int ROWS_A = boxes_num;
+//     int COLS_A = PROTO_CHANNEL;
+//     int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
+//     float *matmul_out = (float *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(float));
+//     matmul_by_cpu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
+//     // matmul_by_npu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B, app_ctx);
+//     timer.tok();
+//     timer.print_time("matmul_by_cpu_fp");
+
+//     timer.tik();
+//     // resize to (boxes_num, model_in_width, model_in_height)
+//     float *seg_mask = (float *)malloc(boxes_num * model_in_height * model_in_width * sizeof(float));
+//     resize_by_opencv_fp(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
+//     timer.tok();
+//     timer.print_time("resize_by_opencv_fp");
+
+//     timer.tik();
+//     // crop mask
+//     uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
+//     memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
+//     crop_mask_fp(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
+//     timer.tok();
+//     timer.print_time("crop_mask_fp");
+// #else
+//     timer.tik();
+//     // compute the mask through Matmul
+//     int ROWS_A = boxes_num;
+//     int COLS_A = PROTO_CHANNEL;
+//     int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
+//     uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
+//     matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
+
+//     timer.tok();
+//     timer.print_time("matmul_by_cpu_uint8");
+
+//     timer.tik();
+//     uint8_t *seg_mask = (uint8_t *)malloc(boxes_num * model_in_height * model_in_width * sizeof(uint8_t));
+//     resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
+//     timer.tok();
+//     timer.print_time("resize_by_opencv_uint8");
+
+//     timer.tik();
+//     // crop mask
+//     uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
+//     memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
+//     crop_mask_uint8(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
+//     timer.tok();
+//     timer.print_time("crop_mask_uint8");
+// #endif
+
+//     timer.tik();
+//     // get real mask
+//     int cropped_height = model_in_height - letter_box->y_pad * 2;
+//     int cropped_width = model_in_width - letter_box->x_pad * 2;
+//     int ori_in_height = app_ctx->input_image_height;
+//     int ori_in_width = app_ctx->input_image_width;
+//     int y_pad = letter_box->y_pad;
+//     int x_pad = letter_box->x_pad;
+//     uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
+//     uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
+//     seg_reverse(all_mask_in_one, cropped_seg_mask, real_seg_mask,
+//                 model_in_height, model_in_width, cropped_height, cropped_width, ori_in_height, ori_in_width, y_pad, x_pad);
+
+//     od_results->results_seg[0].seg_mask = real_seg_mask;
+ 
+
+//     free(all_mask_in_one);
+//     free(cropped_seg_mask);
+//     free(seg_mask);
+//     free(matmul_out);
+//     timer.tok();
+//     timer.print_time("seg_reverse");
+
+//     return 0;
+// }
+
+int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box,
+                 float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
+{
     std::vector<float> filterBoxes;
     std::vector<float> objProbs;
     std::vector<int> classId;
@@ -633,9 +829,10 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     memset(od_results, 0, sizeof(object_detect_result_list));
 
     int dfl_len = app_ctx->output_attrs[0].dims[1] / 4;
-    int output_per_branch = app_ctx->io_num.n_output / 3; // default 3 branch
 
-    // process the outputs of rknn
+    // ---------------------------
+    // 1️⃣ 解析模型输出，生成候选框
+    // ---------------------------
     for (int i = 0; i < 13; i++)
     {
         grid_h = app_ctx->output_attrs[i].dims[2];
@@ -644,35 +841,33 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
 
         if (app_ctx->is_quant)
         {
-            validCount += process_i8(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
-                                     classId, conf_threshold, app_ctx);
+            validCount += process_i8(outputs, i, grid_h, grid_w, model_in_height, model_in_width,
+                                     stride, dfl_len, filterBoxes, filterSegments, proto,
+                                     objProbs, classId, conf_threshold, app_ctx);
         }
         else
         {
-            validCount += process_fp32(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
-                                       classId, conf_threshold);
+            validCount += process_fp32(outputs, i, grid_h, grid_w, model_in_height, model_in_width,
+                                       stride, dfl_len, filterBoxes, filterSegments, proto,
+                                       objProbs, classId, conf_threshold);
         }
     }
 
-    // nms
     if (validCount <= 0)
-    {
         return 0;
-    }
-    std::vector<int> indexArray;
-    for (int i = 0; i < validCount; ++i)
-    {
-        indexArray.push_back(i);
-    }
+
+    // ---------------------------
+    // 2️⃣ NMS 筛选
+    // ---------------------------
+    std::vector<int> indexArray(validCount);
+    for (int i = 0; i < validCount; i++)
+        indexArray[i] = i;
 
     quick_sort_indice_inverse(objProbs, 0, validCount - 1, indexArray);
 
     std::set<int> class_set(std::begin(classId), std::end(classId));
-
     for (auto c : class_set)
-    {
         nms(validCount, filterBoxes, classId, indexArray, c, nms_threshold);
-    }
 
     int last_count = 0;
     od_results->count = 0;
@@ -680,9 +875,8 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     for (int i = 0; i < validCount; ++i)
     {
         if (indexArray[i] == -1 || last_count >= OBJ_NUMB_MAX_SIZE)
-        {
             continue;
-        }
+
         int n = indexArray[i];
 
         float x1 = filterBoxes[n * 4 + 0];
@@ -693,34 +887,35 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
         float obj_conf = objProbs[i];
 
         for (int k = 0; k < PROTO_CHANNEL; k++)
-        {
             filterSegments_by_nms.push_back(filterSegments[n * PROTO_CHANNEL + k]);
-        }
 
         od_results->results[last_count].box.left = x1;
         od_results->results[last_count].box.top = y1;
         od_results->results[last_count].box.right = x2;
         od_results->results[last_count].box.bottom = y2;
-
         od_results->results[last_count].prop = obj_conf;
         od_results->results[last_count].cls_id = id;
+
         last_count++;
     }
+
     od_results->count = last_count;
     int boxes_num = od_results->count;
 
+    // ---------------------------
+    // 3️⃣ 准备裁剪 mask
+    // ---------------------------
     float filterBoxes_by_nms[boxes_num * 4];
     int cls_id[boxes_num];
     for (int i = 0; i < boxes_num; i++)
     {
-        // for crop_mask
-        filterBoxes_by_nms[i * 4 + 0] = od_results->results[i].box.left;   // x1;
-        filterBoxes_by_nms[i * 4 + 1] = od_results->results[i].box.top;    // y1;
-        filterBoxes_by_nms[i * 4 + 2] = od_results->results[i].box.right;  // x2;
-        filterBoxes_by_nms[i * 4 + 3] = od_results->results[i].box.bottom; // y2;
+        filterBoxes_by_nms[i * 4 + 0] = od_results->results[i].box.left;
+        filterBoxes_by_nms[i * 4 + 1] = od_results->results[i].box.top;
+        filterBoxes_by_nms[i * 4 + 2] = od_results->results[i].box.right;
+        filterBoxes_by_nms[i * 4 + 3] = od_results->results[i].box.bottom;
         cls_id[i] = od_results->results[i].cls_id;
 
-        // get real box
+        // 还原原图坐标
         od_results->results[i].box.left = box_reverse(od_results->results[i].box.left, model_in_width, letter_box->x_pad, letter_box->scale);
         od_results->results[i].box.top = box_reverse(od_results->results[i].box.top, model_in_height, letter_box->y_pad, letter_box->scale);
         od_results->results[i].box.right = box_reverse(od_results->results[i].box.right, model_in_width, letter_box->x_pad, letter_box->scale);
@@ -728,76 +923,58 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     }
 
     TIMER timer;
-#ifdef USE_FP_RESIZE
-    timer.tik();
-    // compute the mask through Matmul
-    int ROWS_A = boxes_num;
-    int COLS_A = PROTO_CHANNEL;
-    int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
-    float *matmul_out = (float *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(float));
-    matmul_by_cpu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
-    // matmul_by_npu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B, app_ctx);
-    timer.tok();
-    timer.print_time("matmul_by_cpu_fp");
-
-    timer.tik();
-    // resize to (boxes_num, model_in_width, model_in_height)
-    float *seg_mask = (float *)malloc(boxes_num * model_in_height * model_in_width * sizeof(float));
-    resize_by_opencv_fp(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
-    timer.tok();
-    timer.print_time("resize_by_opencv_fp");
-
-    timer.tik();
-    // crop mask
-    uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
-    memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
-    crop_mask_fp(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
-    timer.tok();
-    timer.print_time("crop_mask_fp");
-#else
-    timer.tik();
-    // compute the mask through Matmul
-    int ROWS_A = boxes_num;
-    int COLS_A = PROTO_CHANNEL;
-    int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
-    uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
-    matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
-
-    timer.tok();
-    timer.print_time("matmul_by_cpu_uint8");
-
-    timer.tik();
     uint8_t *seg_mask = (uint8_t *)malloc(boxes_num * model_in_height * model_in_width * sizeof(uint8_t));
-    resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
-    timer.tok();
-    timer.print_time("resize_by_opencv_uint8");
 
-    timer.tik();
-    // crop mask
-    uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
-    memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
-    crop_mask_uint8(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
-    timer.tok();
-    timer.print_time("crop_mask_uint8");
+    // ---------------------------
+    // matmul + resize
+    // ---------------------------
+#ifdef USE_FP_RESIZE
+    float *matmul_out = (float *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(float));
+    matmul_by_cpu_fp(filterSegments_by_nms, proto, matmul_out, boxes_num, PROTO_CHANNEL, PROTO_HEIGHT * PROTO_WEIGHT);
+    resize_by_opencv_fp(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
+    free(matmul_out);
+#else
+    uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
+    matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, boxes_num, PROTO_CHANNEL, PROTO_HEIGHT * PROTO_WEIGHT);
+    resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
+    free(matmul_out);
 #endif
 
-    timer.tik();
-    // get real mask
-    int cropped_height = model_in_height - letter_box->y_pad * 2;
-    int cropped_width = model_in_width - letter_box->x_pad * 2;
-    int ori_in_height = app_ctx->input_image_height;
-    int ori_in_width = app_ctx->input_image_width;
-    int y_pad = letter_box->y_pad;
-    int x_pad = letter_box->x_pad;
-    uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
-    uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
-    seg_reverse(all_mask_in_one, cropped_seg_mask, real_seg_mask,
-                model_in_height, model_in_width, cropped_height, cropped_width, ori_in_height, ori_in_width, y_pad, x_pad);
-    od_results->results_seg[0].seg_mask = real_seg_mask;
-    free(all_mask_in_one);
-    free(cropped_seg_mask);
+    // ---------------------------
+    // 4️⃣ 按目标裁剪 mask 并存储
+    // ---------------------------
+    for (int i = 0; i < boxes_num; i++)
+    {
+        uint8_t *single_mask = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
+        memset(single_mask, 0, model_in_height * model_in_width * sizeof(uint8_t));
+
+#ifdef USE_FP_RESIZE
+        crop_mask_fp(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
+#else
+        crop_mask_uint8(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
+#endif
+
+        // 得到原图尺寸 mask
+        int cropped_height = model_in_height - letter_box->y_pad * 2;
+        int cropped_width = model_in_width - letter_box->x_pad * 2;
+        int ori_in_height = app_ctx->input_image_height;
+        int ori_in_width = app_ctx->input_image_width;
+        uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
+        uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
+
+        seg_reverse(single_mask, cropped_seg_mask, real_seg_mask,
+                    model_in_height, model_in_width,
+                    cropped_height, cropped_width,
+                    ori_in_height, ori_in_width,
+                    letter_box->y_pad, letter_box->x_pad);
+
+        od_results->results_seg[i].seg_mask = real_seg_mask;
+
+        free(single_mask);
+        free(cropped_seg_mask);
+    }
+
     free(seg_mask);
-    free(matmul_out);
     timer.tok();
     timer.print_time("seg_reverse");
 
@@ -844,22 +1021,71 @@ void deinit_post_process()
 }
 
 
-void extract_seg_mask_contours(object_detect_result_list &od_results,
-                               int target_index,
-                               int width, int height,
-                               std::vector<std::vector<cv::Point>> &out_contours)
-{
-    if (od_results.count <= target_index)
-        return;
+// void extract_seg_mask_contours(object_detect_result_list &od_results,
+//                                int target_index,
+//                                int width, int height,
+//                                std::vector<std::vector<cv::Point>> &out_contours)
+// {
+//     if (od_results.count <= target_index)
+//         return;
 
-    uint8_t *seg_mask = od_results.results_seg[target_index].seg_mask;
-    if (!seg_mask)
+//     uint8_t *seg_mask = od_results.results_seg[target_index].seg_mask;
+//     if (!seg_mask)
+//         return;
+
+//     // -----------------------------
+//     // 1️⃣ seg_mask → cv::Mat
+//     // -----------------------------
+//     cv::Mat mask(height, width, CV_8UC1, seg_mask);
+
+//     // 二值化（前景 = 非零）
+//     cv::Mat bin_mask;
+//     cv::threshold(mask, bin_mask, 0, 255, cv::THRESH_BINARY);
+
+//     // -----------------------------
+//     // 2️⃣ 提取轮廓
+//     // -----------------------------
+//     std::vector<std::vector<cv::Point>> contours;
+//     std::vector<cv::Vec4i> hierarchy;
+//     cv::findContours(
+//         bin_mask,
+//         contours,
+//         hierarchy,
+//         cv::RETR_EXTERNAL,      // 只提取最外层闭合轮廓
+//         cv::CHAIN_APPROX_SIMPLE // 压缩连续点
+//     );
+
+//     // -----------------------------
+//     // 3️⃣ 可选轮廓简化
+//     // -----------------------------
+//     out_contours.clear();
+//     for (const auto &cnt : contours)
+//     {
+//         std::vector<cv::Point> approx;
+//         cv::approxPolyDP(cnt, approx, 2.0, true); // 像素精度 2
+//         out_contours.push_back(approx);
+//     }
+
+//     // -----------------------------
+//     // 4️⃣ 释放 mask
+//     // -----------------------------
+//     free(seg_mask);
+//     od_results.results_seg[target_index].seg_mask = nullptr;
+// }
+
+void extract_seg_mask_contours(
+    object_segment_result* seg,       // 只操作单个目标的 seg_mask
+    int width,
+    int height,
+    std::vector<std::vector<cv::Point>> &out_contours)
+{
+    if (!seg || !seg->seg_mask)
         return;
 
     // -----------------------------
     // 1️⃣ seg_mask → cv::Mat
     // -----------------------------
-    cv::Mat mask(height, width, CV_8UC1, seg_mask);
+    cv::Mat mask(height, width, CV_8UC1, seg->seg_mask);
 
     // 二值化（前景 = 非零）
     cv::Mat bin_mask;
@@ -889,11 +1115,20 @@ void extract_seg_mask_contours(object_detect_result_list &od_results,
         out_contours.push_back(approx);
     }
 
+    // 统计总点数并打印
+    // -----------------------------
+    int total_points = 0;
+    for (const auto& cnt : out_contours) {
+        total_points += static_cast<int>(cnt.size());
+    }
+    printf("extract_seg_mask_contours: total contours = %zu, total points = %d\n",
+           out_contours.size(), total_points);
+
     // -----------------------------
     // 4️⃣ 释放 mask
     // -----------------------------
-    free(seg_mask);
-    od_results.results_seg[target_index].seg_mask = nullptr;
+    free(seg->seg_mask);
+    seg->seg_mask = nullptr;
 }
 
 // 对mark区域边缘，做移动平滑，减弱mark检测边缘的锯齿型抖动。
@@ -943,15 +1178,19 @@ void fillCameraDetectResult(
     ObjectCameraDetectResult& one,
     ConfigInfo& config)
 {
+    // printf("enter Filling camera detect result for one object...\n");
+    // printf("edge ptr = %p, num = %d\n",
+    //    det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates,
+    //    det->camera_coordinates.add_edge_point_num);
 
     // ---------- 1. 类别 & 置信度 ----------
     one.prop   = det->prop;
     one.cls_id = config.CARPET_AREA;
 
-    printf("det->box.top = %d\n", det->box.top);
-    printf("det->box.bottom = %d\n", det->box.bottom);
-    printf("det->box.left = %d\n", det->box.left);
-    printf("det->box.right = %d\n", det->box.right);
+    // printf("det->box.top = %d\n", det->box.top);
+    // printf("det->box.bottom = %d\n", det->box.bottom);
+    // printf("det->box.left = %d\n", det->box.left);
+    // printf("det->box.right = %d\n", det->box.right);
     // ---------- 2. 四个角点 ----------
     one.coords.clear();
     one.coords.resize(4);
@@ -978,16 +1217,16 @@ void fillCameraDetectResult(
     one.target_box.left   = det->box.left;
     one.target_box.right  = det->box.right;
     
-    printf("det->box.top = %d\n", det->box.top);
-    printf("det->box.bottom = %d\n", det->box.bottom);
-    printf("det->box.left = %d\n", det->box.left);
-    printf("det->box.right = %d\n", det->box.right);
+    // printf("det->box.top = %d\n", det->box.top);
+    // printf("det->box.bottom = %d\n", det->box.bottom);
+    // printf("det->box.left = %d\n", det->box.left);
+    // printf("det->box.right = %d\n", det->box.right);
 
-    printf("Target Box: left=%d, top=%d, right=%d, bottom=%d\n",
-           one.target_box.left,
-           one.target_box.top,
-           one.target_box.right,
-           one.target_box.bottom);
+    // printf("Target Box: left=%d, top=%d, right=%d, bottom=%d\n",
+    //        one.target_box.left,
+    //        one.target_box.top,
+    //        one.target_box.right,
+    //        one.target_box.bottom);
 
     // ---------- 4. 边缘采样点（按真实数量） ----------
     one.add_edge_point_single_pixel_camera_coordinates.clear();
@@ -997,6 +1236,7 @@ void fillCameraDetectResult(
         det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates;
 
     if (edge_num <= 0 || edge_src == nullptr) {
+        printf("No edge points for this object (edge_num = %d)\n", edge_num);
         return;
     }
 
@@ -1011,4 +1251,72 @@ void fillCameraDetectResult(
             estimateDistance(src.Z, config);
     }
     printf("edge_num = %d\n", edge_num);    
+}
+
+void filter_mask_contours(
+    const std::vector<std::vector<cv::Point>> &input_contours, // 输入：原始轮廓集合（来自mask）
+    std::vector<std::vector<cv::Point>> &output_contours)      // 输出：过滤+平滑后的轮廓
+{
+    output_contours.clear(); // 先清空输出
+
+    // 遍历每一个轮廓
+    for (const auto &cnt : input_contours)
+    {
+        // -----------------------------
+        // 1️⃣ 面积过滤（最关键）
+        // -----------------------------
+        // 作用：去除小噪点 / 小碎片（YOLOv8 seg常见问题）
+        double area = cv::contourArea(cnt);
+        if (area < 200)   // ⚠️ 可调参数：建议根据分辨率调 (100~1000)
+            continue;
+
+        // -----------------------------
+        // 2️⃣ 外接矩形 + 长宽比过滤
+        // -----------------------------
+        // 获取最小外接矩形
+        cv::Rect rect = cv::boundingRect(cnt);
+
+        // 长宽比 = 宽 / 高
+        float aspect_ratio = (float)rect.width / rect.height;
+
+        // 作用：过滤异常细长的区域（如边缘噪声、电线误检等）
+        if (aspect_ratio > 10.0 || aspect_ratio < 0.1)
+            continue;
+
+        // -----------------------------
+        // 3️⃣ 周长过滤
+        // -----------------------------
+        // 计算轮廓周长（闭合）
+        double perimeter = cv::arcLength(cnt, true);
+
+        // 作用：进一步过滤过小或不规则轮廓
+        if (perimeter < 50)   // ⚠️ 可调参数
+            continue;
+
+        // -----------------------------
+        // 4️⃣ 填充率过滤（非常重要）
+        // -----------------------------
+        // 填充率 = 实际面积 / 外接矩形面积
+        float fill_ratio = area / (rect.width * rect.height + 1e-5);
+
+        // 作用：
+        // - 过滤“很空”的区域（例如细线、噪声、破碎mask）
+        // - 对扫地机器人识别电线特别有效
+        if (fill_ratio < 0.2)   // ⚠️ 可调参数（0.1~0.5）
+            continue;
+
+        // -----------------------------
+        // 5️⃣ 轮廓平滑（多边形逼近）
+        // -----------------------------
+        // 作用：
+        // - 减少轮廓点数量
+        // - 提高稳定性（便于后续路径规划/避障）
+        std::vector<cv::Point> approx;
+        cv::approxPolyDP(cnt, approx, 2.0, true); // 2.0 = 平滑精度（越大越平滑）
+
+        // -----------------------------
+        // 6️⃣ 保存结果
+        // -----------------------------
+        output_contours.push_back(approx);
+    }
 }
