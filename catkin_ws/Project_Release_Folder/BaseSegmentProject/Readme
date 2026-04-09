@@ -8,7 +8,4 @@
   catkin_make install
 
 4、启用检测功能：
-  rosparam set /task_manager/base_inspection_enable true
-
-5、启动任务：
-  ./install/lib/base_detect_subscriber/run.sh
+  rosparam set /task_manager/base_inspecti

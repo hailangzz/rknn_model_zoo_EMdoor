@@ -35,7 +35,7 @@ cd /home/robot/zhangzhuo/catkin_wc
 
 source /opt/ros/noetic/setup.bash
 
-rosparam set /task_manager/carpet_inspection_enable true
+rosparam set /task_manager/base_inspection_enable true
 
 source devel/setup.bash
 

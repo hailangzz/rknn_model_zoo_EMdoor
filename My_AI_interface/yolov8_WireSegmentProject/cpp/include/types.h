@@ -42,7 +42,7 @@ struct ConfigInfo {
     int input_height;
     float score_threshold;
     int max_frame_threshold;
-    int BASE_AREA;                     // 基础目标的classid，用于建图时，确认世界地图上障碍物构建，基础区域的重要程度
+    int CARPET_AREA;                     // 地毯目标的classid，用于建图时，确认世界地图上障碍物构建，地毯区域的重要程度
 
     float camera_z_axle_top_resize_rate; // 相机坐标系，Z轴远端缩放比例
     float camera_z_axle_polyfit_w0; // 多项式拟合，二次项系数
