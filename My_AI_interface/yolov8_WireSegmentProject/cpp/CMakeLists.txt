@@ -103,14 +103,14 @@ endif()
 # ============================================================
 # Shared library (inference interface)
 # ============================================================
-add_library(rknn_base_detect SHARED
+add_library(rknn_wire_detect SHARED
     src/base_detect_interface.cc
     src/postprocess.cc
     src/transform_coordinates.cc
     ${rknpu_yolov8_file}
 )
 
-target_include_directories(rknn_base_detect PUBLIC
+target_include_directories(rknn_wire_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/timer
@@ -118,7 +118,7 @@ target_include_directories(rknn_base_detect PUBLIC
     ${OpenCV_INCLUDE_DIRS}
 )
 
-target_link_libraries(rknn_base_detect
+target_link_libraries(rknn_wire_detect
     imageutils
     fileutils
     imagedrawing
@@ -129,14 +129,14 @@ target_link_libraries(rknn_base_detect
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
-    target_link_libraries(rknn_base_detect Threads::Threads)
+    target_link_libraries(rknn_wire_detect Threads::Threads)
 endif()
 
 # ============================================================
 # Install
 # ============================================================
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
-install(TARGETS rknn_base_detect DESTINATION lib)
+install(TARGETS rknn_wire_detect DESTINATION lib)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/base.jpg DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION model)

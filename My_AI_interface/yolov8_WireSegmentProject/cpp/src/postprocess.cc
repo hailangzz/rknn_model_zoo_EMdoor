@@ -1185,7 +1185,7 @@ void fillCameraDetectResult(
 
     // ---------- 1. 类别 & 置信度 ----------
     one.prop   = det->prop;
-    one.cls_id = config.CARPET_AREA;
+    one.cls_id = config.BASE_AREA;
 
     // printf("det->box.top = %d\n", det->box.top);
     // printf("det->box.bottom = %d\n", det->box.bottom);

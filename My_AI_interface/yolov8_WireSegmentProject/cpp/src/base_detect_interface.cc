@@ -98,8 +98,9 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         
         //获取模型推理，mark轮廓点集数组信息。
         // extract_seg_mask_contours(od_results, i, src_image.width, src_image.height, contours_mark_point);
-        // 获取 mask 轮廓
+        // 获取 mask 轮廓。推理的结果是基于原始图像尺寸的（而非输入模型的缩放尺寸），因此这里传入原图的宽高。
         extract_seg_mask_contours(seg, src_image.width, src_image.height, contours_mark_point);
+        // extract_seg_mask_contours(seg, g_ctx.config.input_width, g_ctx.config.input_height, contours_mark_point);
 
         int total_points = 0;
         for (const auto& contour : contours_mark_point) {
@@ -144,7 +145,7 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         // printf("%d\n", det->box.right);
         // printf("%d\n", det->box.bottom);
 
-        results.push_back(one); 
+        results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
 
         // 边框合法性校验：
         ObjectSize3D size;
