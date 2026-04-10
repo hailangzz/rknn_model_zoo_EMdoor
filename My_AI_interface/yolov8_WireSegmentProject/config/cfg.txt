@@ -6,9 +6,18 @@
 //input_width=960
 //input_height=576
 
-model_path=./model/wire_f_v3_3588_640p.rknn
-input_width=640
-input_height=640
+//model_path=./model/wire_f_v3_3588_960p.rknn
+//input_width=960
+//input_height=960
+
+//model_path=./model/wire_f_v3_3588_640p.rknn
+//input_width=640
+//input_height=640
+
+model_path=./model/wire_f_v3_3588_1280p.rknn
+input_width=1280
+input_height=1280
+
 score_threshold=0.7f
 
 //检测帧数阈值

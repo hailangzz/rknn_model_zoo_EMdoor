@@ -20,11 +20,16 @@
 #define PROP_BOX_SIZE (5 + OBJ_CLASS_NUM)
 
 #define PROTO_CHANNEL 32
-#define PROTO_HEIGHT 160
-#define PROTO_WEIGHT 160
+// #define PROTO_HEIGHT 160
+// #define PROTO_WEIGHT 160
+// #define PROTO_HEIGHT 240
+// #define PROTO_WEIGHT 240
+// #define PROTO_HEIGHT 240
+// #define PROTO_WEIGHT 144
+#define PROTO_HEIGHT 320
+#define PROTO_WEIGHT 320
 
 #define N_CLASS_COLORS 20
-
 
 // class rknn_app_context_t;
 
@@ -47,6 +52,7 @@ typedef struct {
     object_detect_result results[OBJ_NUMB_MAX_SIZE];
     object_segment_result results_seg[OBJ_NUMB_MAX_SIZE];
 } object_detect_result_list;
+
 
 int init_post_process();
 void deinit_post_process();

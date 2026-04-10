@@ -790,6 +790,132 @@ int convert_image_with_letterbox(image_buffer_t* src_image, image_buffer_t* dst_
     return ret;
 }
 
+// int convert_image_with_letterbox(image_buffer_t* src_image,
+//                                  image_buffer_t* dst_image,
+//                                  letterbox_t* letterbox,
+//                                  char color)
+// {
+//     if (!src_image || !dst_image)
+//         return -1;
+
+//     int ret = 0;
+
+//     int src_w = src_image->width;
+//     int src_h = src_image->height;
+//     int dst_w = dst_image->width;
+//     int dst_h = dst_image->height;
+
+//     // -----------------------------
+//     // Step 1: 计算缩放比例（保持比例）
+//     // -----------------------------
+//     float scale_w = (float)dst_w / src_w;
+//     float scale_h = (float)dst_h / src_h;
+
+//     float scale = (scale_w < scale_h) ? scale_w : scale_h;
+
+//     int resize_w = (int)(src_w * scale + 0.5f);
+//     int resize_h = (int)(src_h * scale + 0.5f);
+
+//     // -----------------------------
+//     // Step 2: 对齐优化（RGA / 硬件友好）
+//     // -----------------------------
+//     // 宽对齐到4，高对齐到2（避免访问问题）
+//     resize_w = (resize_w / 4) * 4;
+//     resize_h = (resize_h / 2) * 2;
+
+//     // 防止变成0
+//     if (resize_w <= 0) resize_w = 4;
+//     if (resize_h <= 0) resize_h = 2;
+
+//     // -----------------------------
+//     // Step 3: 重新计算真实 scale（关键修复点）
+//     // -----------------------------
+//     float real_scale_w = (float)resize_w / src_w;
+//     float real_scale_h = (float)resize_h / src_h;
+
+//     // 一般两者接近，这里统一用 width
+//     float real_scale = real_scale_w;
+
+//     // -----------------------------
+//     // Step 4: 计算 padding（对称！）
+//     // -----------------------------
+//     int pad_w = dst_w - resize_w;
+//     int pad_h = dst_h - resize_h;
+
+//     int pad_left   = pad_w / 2;
+//     int pad_right  = pad_w - pad_left;
+//     int pad_top    = pad_h / 2;
+//     int pad_bottom = pad_h - pad_top;
+
+//     // -----------------------------
+//     // Step 5: 构造 ROI
+//     // -----------------------------
+//     image_rect_t src_box;
+//     src_box.left   = 0;
+//     src_box.top    = 0;
+//     src_box.right  = src_w - 1;
+//     src_box.bottom = src_h - 1;
+
+//     image_rect_t dst_box;
+//     dst_box.left   = pad_left;
+//     dst_box.top    = pad_top;
+//     dst_box.right  = pad_left + resize_w - 1;
+//     dst_box.bottom = pad_top + resize_h - 1;
+
+//     // -----------------------------
+//     // Step 6: 保存 letterbox 信息（关键）
+//     // -----------------------------
+//     if (letterbox)
+//     {
+//         letterbox->scale = real_scale;
+//         letterbox->x_pad = pad_left;
+//         letterbox->y_pad = pad_top;
+//     }
+
+//     // -----------------------------
+//     // Step 7: 分配 dst buffer（如果没有）
+//     // -----------------------------
+//     if (dst_image->virt_addr == NULL && dst_image->fd <= 0)
+//     {
+//         int dst_size = get_image_size(dst_image);
+
+//         // 使用对齐内存（更稳定）
+//         if (posix_memalign((void**)&dst_image->virt_addr, 64, dst_size) != 0)
+//         {
+//             printf("posix_memalign failed\n");
+//             return -1;
+//         }
+
+//         memset(dst_image->virt_addr, color, dst_size);
+//     }
+
+//     // -----------------------------
+//     // Step 8: 调用底层 resize + padding
+//     // -----------------------------
+//     ret = convert_image(src_image, dst_image, &src_box, &dst_box, color);
+//     if (ret < 0)
+//     {
+//         printf("convert_image failed\n");
+//         return ret;
+//     }
+
+//     // -----------------------------
+//     // Debug（建议保留）
+//     // -----------------------------
+// #ifdef DEBUG_LETTERBOX
+//     printf("letterbox:\n");
+//     printf("  src: %dx%d\n", src_w, src_h);
+//     printf("  dst: %dx%d\n", dst_w, dst_h);
+//     printf("  resize: %dx%d\n", resize_w, resize_h);
+//     printf("  pad: left=%d right=%d top=%d bottom=%d\n",
+//            pad_left, pad_right, pad_top, pad_bottom);
+//     printf("  scale: %.6f\n", real_scale);
+// #endif
+
+//     return 0;
+// }
+
+
 // void wrap_nv21_to_image_buffer(const uint8_t* nv21, int width,int height,image_buffer_t* out_buf)
 // {
 //     if (!nv21 || !out_buf || width <= 0 || height <= 0) {

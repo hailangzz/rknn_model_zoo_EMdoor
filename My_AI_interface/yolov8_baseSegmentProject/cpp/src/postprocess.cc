@@ -815,7 +815,16 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     std::vector<int> classId;
 
     std::vector<float> filterSegments;
-    float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
+    // float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
+    int proto_size = PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT;
+    float *proto = (float *)malloc(proto_size * sizeof(float));
+    if (!proto)
+    {
+        printf("malloc proto failed\n");
+        return -1;
+    }
+    memset(proto, 0, proto_size * sizeof(float));
+    
     std::vector<float> filterSegments_by_nms;
 
     int model_in_width = app_ctx->model_width;

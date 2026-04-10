@@ -320,16 +320,52 @@ void matmul_by_cpu_uint8(std::vector<float> &A, float *B, uint8_t *C, int ROWS_A
     }
 }
 
-void seg_reverse(uint8_t *seg_mask, uint8_t *cropped_seg, uint8_t *seg_mask_real,
-                 int model_in_height, int model_in_width, int cropped_height, int cropped_width, int ori_in_height, int ori_in_width, int y_pad, int x_pad)
-{
+// // 以下seg_reverse函数，作用是将模型输出的分割结果（seg_mask）进行反向处理，得到与原始输入图像尺寸相匹配的分割掩码（seg_mask_real）。
+// // 注：此函数仅适用宽、高相等的输入输出情况（如640x640），如果输入输出尺寸不相等，需根据实际情况调整反向处理逻辑。
+// void seg_reverse(uint8_t *seg_mask, uint8_t *cropped_seg, uint8_t *seg_mask_real,
+//                  int model_in_height, int model_in_width, int cropped_height, int cropped_width, int ori_in_height, int ori_in_width, int y_pad, int x_pad)
+// {
 
+//     if (y_pad == 0 && x_pad == 0 && ori_in_height == model_in_height && ori_in_width == model_in_width)
+//     {
+//         memcpy(seg_mask_real, seg_mask, ori_in_height * ori_in_width);
+//         return;
+//     }
+
+//     int cropped_index = 0;
+//     for (int i = 0; i < model_in_height; i++)
+//     {
+//         for (int j = 0; j < model_in_width; j++)
+//         {
+//             if (i >= y_pad && i < model_in_height - y_pad && j >= x_pad && j < model_in_width - x_pad)
+//             {
+//                 int seg_index = i * model_in_width + j;
+//                 cropped_seg[cropped_index] = seg_mask[seg_index];
+//                 cropped_index++;
+//             }
+//         }
+//     }
+//     // Note: Here are different methods provided for implementing single-channel image scaling.
+//     //       The method of using rga to resize the image requires that the image size is 2 aligned.
+//     resize_by_opencv_uint8(cropped_seg, cropped_width, cropped_height, 1, seg_mask_real, ori_in_width, ori_in_height);
+//     // resize_by_rga_rk356x(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
+//     // resize_by_rga_rk3588(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
+// }
+
+
+void seg_reverse(uint8_t *seg_mask, uint8_t *cropped_seg, uint8_t *seg_mask_real,
+                 int model_in_height, int model_in_width,
+                 int cropped_height, int cropped_width,
+                 int ori_in_height, int ori_in_width,
+                 int y_pad, int x_pad)
+{
     if (y_pad == 0 && x_pad == 0 && ori_in_height == model_in_height && ori_in_width == model_in_width)
     {
         memcpy(seg_mask_real, seg_mask, ori_in_height * ori_in_width);
         return;
     }
 
+    // 1️⃣ 裁掉 padding
     int cropped_index = 0;
     for (int i = 0; i < model_in_height; i++)
     {
@@ -343,11 +379,16 @@ void seg_reverse(uint8_t *seg_mask, uint8_t *cropped_seg, uint8_t *seg_mask_real
             }
         }
     }
-    // Note: Here are different methods provided for implementing single-channel image scaling.
-    //       The method of using rga to resize the image requires that the image size is 2 aligned.
-    resize_by_opencv_uint8(cropped_seg, cropped_width, cropped_height, 1, seg_mask_real, ori_in_width, ori_in_height);
-    // resize_by_rga_rk356x(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
-    // resize_by_rga_rk3588(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
+
+    // 2️⃣ 构造 cv::Mat
+    cv::Mat tmp(cropped_height, cropped_width, CV_8UC1, cropped_seg);
+    cv::Mat dst(ori_in_height, ori_in_width, CV_8UC1);
+
+    // 3️⃣ resize 到原图尺寸（非方形输入也能正确）
+    cv::resize(tmp, dst, cv::Size(ori_in_width, ori_in_height), 0, 0, cv::INTER_NEAREST);
+
+    // 4️⃣ 复制数据回 seg_mask_real
+    memcpy(seg_mask_real, dst.data, ori_in_height * ori_in_width);
 }
 
 static int box_reverse(int position, int boundary, int pad, float scale)
@@ -807,15 +848,50 @@ static int process_fp32(rknn_output *all_input, int input_id, int grid_h, int gr
 //     return 0;
 // }
 
+/* 后处理流程说明：
+模型输出
+   ↓
+process_xxx
+   ↓
+候选框 + mask系数 + proto
+   ↓
+NMS
+   ↓
+最终框 + mask系数
+   ↓
+matmul（生成160×160 mask）
+   ↓
+resize（放大到模型尺寸）
+   ↓
+crop（按框裁剪）
+   ↓
+seg_reverse（去padding + 映射原图）
+   ↓
+最终mask
+*/
+
+//  后处理函数 post_process 主要负责将模型的原始输出转换为最终的检测结果，包括以下几个步骤：
+
+// 固定PROTO_HEIGHT * PROTO_WEIGHT，的后处理函数
+
 int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box,
                  float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
 {
     std::vector<float> filterBoxes;
     std::vector<float> objProbs;
     std::vector<int> classId;
-
+    
     std::vector<float> filterSegments;
-    float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
+    // float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
+    int proto_size = PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT;
+    float *proto = (float *)malloc(proto_size * sizeof(float));
+    if (!proto)
+    {
+        printf("malloc proto failed\n");
+        return -1;
+    }
+    memset(proto, 0, proto_size * sizeof(float));
+
     std::vector<float> filterSegments_by_nms;
 
     int model_in_width = app_ctx->model_width;
@@ -825,7 +901,7 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     int stride = 0;
     int grid_h = 0;
     int grid_w = 0;
-
+    
     memset(od_results, 0, sizeof(object_detect_result_list));
 
     int dfl_len = app_ctx->output_attrs[0].dims[1] / 4;
@@ -937,36 +1013,165 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
     matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, boxes_num, PROTO_CHANNEL, PROTO_HEIGHT * PROTO_WEIGHT);
     resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
+    
+
     free(matmul_out);
 #endif
 
+    // // ---------------------------
+    // // 4️⃣ 按目标裁剪 mask 并存储
+    // // ---------------------------
+    // for (int i = 0; i < boxes_num; i++)
+    // {
+    //     uint8_t *single_mask = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
+    //     memset(single_mask, 0, model_in_height * model_in_width * sizeof(uint8_t));
+
+    //     #ifdef USE_FP_RESIZE
+    //             crop_mask_fp(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
+    //     #else
+    //             crop_mask_uint8(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
+    //     #endif
+
+    //     // 得到原图尺寸 mask
+    //     int cropped_height = model_in_height - letter_box->y_pad * 2;
+    //     int cropped_width = model_in_width - letter_box->x_pad * 2;
+    //     int ori_in_height = app_ctx->input_image_height;
+    //     int ori_in_width = app_ctx->input_image_width;
+    //     uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
+    //     uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
+
+    //     seg_reverse(single_mask, cropped_seg_mask, real_seg_mask,
+    //                 model_in_height, model_in_width,
+    //                 cropped_height, cropped_width,
+    //                 ori_in_height, ori_in_width,
+    //                 letter_box->y_pad, letter_box->x_pad);
+
+    //     od_results->results_seg[i].seg_mask = real_seg_mask;
+
+    //     free(single_mask);
+    //     free(cropped_seg_mask);
+    // }
+
+
+    for (int i = 0; i < app_ctx->io_num.n_output; i++)
+    {
+        printf("[OUT %d] dims = [", i);
+
+        for (int j = 0; j < app_ctx->output_attrs[i].n_dims; j++)
+        {
+            printf("%d", app_ctx->output_attrs[i].dims[j]);
+            if (j != app_ctx->output_attrs[i].n_dims - 1)
+                printf(", ");
+        }
+
+        printf("]\n");
+    }
+
     // ---------------------------
-    // 4️⃣ 按目标裁剪 mask 并存储
+    // 4️⃣ 按目标裁剪 mask 并存储（带调试）
     // ---------------------------
     for (int i = 0; i < boxes_num; i++)
     {
-        uint8_t *single_mask = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
-        memset(single_mask, 0, model_in_height * model_in_width * sizeof(uint8_t));
+        printf("\n========== [MASK DEBUG] object %d ==========\n", i);
 
-#ifdef USE_FP_RESIZE
-        crop_mask_fp(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
-#else
-        crop_mask_uint8(seg_mask, single_mask, &filterBoxes_by_nms[i * 4], 1, &cls_id[i], model_in_height, model_in_width);
-#endif
+        // 👉 打印 box（模型坐标）
+        printf("model box: [%.2f, %.2f, %.2f, %.2f]\n",
+            filterBoxes_by_nms[i * 4 + 0],
+            filterBoxes_by_nms[i * 4 + 1],
+            filterBoxes_by_nms[i * 4 + 2],
+            filterBoxes_by_nms[i * 4 + 3]);
 
-        // 得到原图尺寸 mask
+        // 👉 打印原图 box
+        printf("orig box:  [%d, %d, %d, %d]\n",
+            od_results->results[i].box.left,
+            od_results->results[i].box.top,
+            od_results->results[i].box.right,
+            od_results->results[i].box.bottom);
+
+        uint8_t *single_mask = (uint8_t *)malloc(model_in_height * model_in_width);
+        memset(single_mask, 0, model_in_height * model_in_width);
+
+
+    #ifdef USE_FP_RESIZE
+        crop_mask_fp(seg_mask, single_mask,
+                    &filterBoxes_by_nms[i * 4],
+                    1, &cls_id[i],
+                    model_in_height, model_in_width);
+    #else
+        crop_mask_uint8(seg_mask, single_mask,
+                        &filterBoxes_by_nms[i * 4],
+                        1, &cls_id[i],
+                        model_in_height, model_in_width);
+    #endif
+
+        // 👉 统计 mask 非零区域（判断有没有裁对）
+        int non_zero = 0;
+        for (int p = 0; p < model_in_height * model_in_width; p++)
+        {
+            if (single_mask[p] > 0)
+                non_zero++;
+        }
+        printf("single_mask non-zero pixels: %d\n", non_zero);
+
+        // ---------------------------
+        // letterbox 参数打印
+        // ---------------------------
+        printf("letterbox: x_pad=%d, y_pad=%d, scale=%.4f\n",
+            letter_box->x_pad,
+            letter_box->y_pad,
+            letter_box->scale);
+
         int cropped_height = model_in_height - letter_box->y_pad * 2;
-        int cropped_width = model_in_width - letter_box->x_pad * 2;
-        int ori_in_height = app_ctx->input_image_height;
-        int ori_in_width = app_ctx->input_image_width;
-        uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
-        uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
+        int cropped_width  = model_in_width  - letter_box->x_pad * 2;
 
+        printf("cropped size: %d x %d\n", cropped_width, cropped_height);
+
+        int ori_in_height = app_ctx->input_image_height;
+        int ori_in_width  = app_ctx->input_image_width;
+
+        printf("original image size: %d x %d\n", ori_in_width, ori_in_height);
+
+        uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width);
+        uint8_t *real_seg_mask    = (uint8_t *)malloc(ori_in_height * ori_in_width);
+
+        // ---------------------------
+        // seg_reverse
+        // ---------------------------
         seg_reverse(single_mask, cropped_seg_mask, real_seg_mask,
                     model_in_height, model_in_width,
                     cropped_height, cropped_width,
                     ori_in_height, ori_in_width,
                     letter_box->y_pad, letter_box->x_pad);
+
+        // 👉 检查最终 mask
+        int final_non_zero = 0;
+        for (int p = 0; p < ori_in_height * ori_in_width; p++)
+        {
+            if (real_seg_mask[p] > 0)
+                final_non_zero++;
+        }
+        printf("final_mask non-zero pixels: %d\n", final_non_zero);
+
+        // 👉 打印 mask 边界（粗略检测是否偏移）
+        int min_x = ori_in_width, min_y = ori_in_height;
+        int max_x = 0, max_y = 0;
+
+        for (int y = 0; y < ori_in_height; y++)
+        {
+            for (int x = 0; x < ori_in_width; x++)
+            {
+                if (real_seg_mask[y * ori_in_width + x] > 0)
+                {
+                    if (x < min_x) min_x = x;
+                    if (y < min_y) min_y = y;
+                    if (x > max_x) max_x = x;
+                    if (y > max_y) max_y = y;
+                }
+            }
+        }
+
+        printf("mask bbox in original image: [%d, %d, %d, %d]\n",
+            min_x, min_y, max_x, max_y);
 
         od_results->results_seg[i].seg_mask = real_seg_mask;
 
@@ -978,8 +1183,12 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     timer.tok();
     timer.print_time("seg_reverse");
 
+    free(proto);
+
     return 0;
 }
+
+
 
 int init_post_process()
 {

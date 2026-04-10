@@ -138,7 +138,7 @@ endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(TARGETS rknn_wire_detect DESTINATION lib)
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/base.jpg DESTINATION model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/carpet.jpg DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../config/cfg.txt DESTINATION config)
 

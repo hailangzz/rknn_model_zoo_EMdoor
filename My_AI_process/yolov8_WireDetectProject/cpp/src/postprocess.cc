@@ -517,7 +517,7 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
     int stride = 0;
     int grid_h = 0;
     int grid_w = 0;
-    int model_in_w = app_ctx->model_width;
+    int model_in_w = app_ctx->model_width;    //模型输入的宽高，默认为640*640，后续可以根据实际情况修改·
     int model_in_h = app_ctx->model_height;
 
     memset(od_results, 0, sizeof(object_detect_result_list));
