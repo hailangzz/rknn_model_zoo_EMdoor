@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   cv_bridge
-  carpet_detect_msgs
+  base_detect_msgs
 )
 
 # OpenCV（cv_bridge 依赖）
@@ -24,7 +24,7 @@ catkin_package(
     std_msgs
     sensor_msgs
     cv_bridge
-    carpet_detect_msgs
+    base_detect_msgs
 )
 
 # ------------------------------------------------

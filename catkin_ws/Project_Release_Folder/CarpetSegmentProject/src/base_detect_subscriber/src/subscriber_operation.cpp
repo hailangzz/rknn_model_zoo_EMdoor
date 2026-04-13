@@ -5,7 +5,7 @@
 
 // 将xyz数据点，写入到本地文件中
 void appendCoordsToFile(
-    carpet_detect_msgs::ObjectCameraDetectResult& dst,
+    base_detect_msgs::ObjectCameraDetectResult& dst,
     const std::string& file_path)
 {
     std::ofstream ofs(file_path, std::ios::out | std::ios::app);
@@ -32,7 +32,7 @@ void appendCoordsToFile(
 
 
 
-CarpetDetectNode::CarpetDetectNode(ros::NodeHandle& nh)        
+BaseDetectNode::BaseDetectNode(ros::NodeHandle& nh)        
     {
       nh_ = nh;
       has_new_frame_ = false;
@@ -40,37 +40,37 @@ CarpetDetectNode::CarpetDetectNode(ros::NodeHandle& nh)
       infer_enable_ = false;  // 默认允许推理
 
       /* 初始化模型 */
-      if (!carpet_model_init("./config/cfg.txt"))
+      if (!base_model_init("./config/cfg.txt"))
       {
-          ROS_FATAL("Failed to init carpet model");
+          ROS_FATAL("Failed to init base model");
           throw std::runtime_error("model init failed");
       }
 
       /* 订阅图像 */
-      image_sub_ = nh_.subscribe( image_sub_topic_, 1, &CarpetDetectNode::imageCallback, this);
+      image_sub_ = nh_.subscribe( image_sub_topic_, 1, &BaseDetectNode::imageCallback, this);
 
       //  新增：发布检测结果
-      detect_result_pub_ = nh_.advertise<carpet_detect_msgs::ObjectCameraDetectResultArray>( detect_result_pub_topic_, 1);
+      detect_result_pub_ = nh_.advertise<base_detect_msgs::ObjectCameraDetectResultArray>( detect_result_pub_topic_, 1);
 
       // 新增：发布带检测框图像
       debug_image_pub_ = nh_.advertise<sensor_msgs::Image>(debug_image_pub_topic_, 1);
 
       /* 启动 ROS 参数监控线程 */
-      rosparam_monitor_thread_ = std::thread(&CarpetDetectNode::rosparamMonitorLoop, this);
+      rosparam_monitor_thread_ = std::thread(&BaseDetectNode::rosparamMonitorLoop, this);
 
-      ROS_INFO("CarpetDetectNode initialized");
+      ROS_INFO("BaseDetectNode initialized");
     }
 
-CarpetDetectNode::~CarpetDetectNode()
+BaseDetectNode::~BaseDetectNode()
     {
         shutdown();
     }
 
-void CarpetDetectNode::create_infer_thread(){
+void BaseDetectNode::create_infer_thread(){
   try
       {
     /* 启动推理线程 */
-      infer_thread_ = std::thread(&CarpetDetectNode::inferenceLoop, this);
+      infer_thread_ = std::thread(&BaseDetectNode::inferenceLoop, this);
       }
   catch (const cv_bridge::Exception& e)
     {
@@ -78,7 +78,7 @@ void CarpetDetectNode::create_infer_thread(){
     }
 }
 
-void CarpetDetectNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
+void BaseDetectNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     {
         try
         {
@@ -100,7 +100,7 @@ void CarpetDetectNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
     /* ============ 推理主循环 ============ */
-void CarpetDetectNode::inferenceLoop()
+void BaseDetectNode::inferenceLoop()
 {
     // ROS_INFO("YOLOv8 inference thread started");
 
@@ -124,19 +124,19 @@ void CarpetDetectNode::inferenceLoop()
         }
 
         /* ---------- 推理 ---------- */
-        // ROS_DEBUG("carpet_detect_infer begin");
-        // carpet_detect_infer(img, camera_coordinates_results_);
-        if (!carpet_detect_infer(img, camera_coordinates_results_))
+        // ROS_DEBUG("base_detect_infer begin");
+        // base_detect_infer(img, camera_coordinates_results_);
+        if (!base_detect_infer(img, camera_coordinates_results_))
             {
-                ROS_DEBUG("No valid carpet detected, skip publish");
+                ROS_DEBUG("No valid object detected, skip publish");
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
 
-        ROS_DEBUG("carpet_detect_infer finished");
+        ROS_DEBUG("base_detect_infer finished");
 
         /* ---------- 构造 ROS 消息 ---------- */
-        carpet_detect_msgs::ObjectCameraDetectResultArray msg;
+        base_detect_msgs::ObjectCameraDetectResultArray msg;
         msg.header.stamp = ros::Time::now();
         msg.header.frame_id = camera_coordinate_system_flag_;   // 很重要
 
@@ -159,7 +159,7 @@ void CarpetDetectNode::inferenceLoop()
                 //     ROS_INFO(" dst : [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
                 // }
 
-                carpet_detect_msgs::ObjectCameraDetectResult one;
+                base_detect_msgs::ObjectCameraDetectResult one;
                 convertToMsg(r, one);
                 msg.results.push_back(one);
             }
@@ -176,7 +176,7 @@ void CarpetDetectNode::inferenceLoop()
 }
 
     /* ============ 资源释放 ============ */
-void CarpetDetectNode::shutdown()
+void BaseDetectNode::shutdown()
 {
     if (!running_)
         return;
@@ -190,12 +190,12 @@ void CarpetDetectNode::shutdown()
     if (rosparam_monitor_thread_.joinable())
         rosparam_monitor_thread_.join();
 
-    carpet_model_release();
+    base_model_release();
 
-    ROS_INFO("CarpetDetectNode shutdown complete");
+    ROS_INFO("BaseDetectNode shutdown complete");
 }
 
-void CarpetDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<ObjectCameraDetectResult>& results,const std_msgs::Header& header)
+void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<ObjectCameraDetectResult>& results,const std_msgs::Header& header)
 {
     if (img.empty())
         return;
@@ -274,9 +274,9 @@ void CarpetDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Ob
 }
 
 
-void CarpetDetectNode::convertToMsg(
+void BaseDetectNode::convertToMsg(
     const ObjectCameraDetectResult& src,
-    carpet_detect_msgs::ObjectCameraDetectResult& dst)
+    base_detect_msgs::ObjectCameraDetectResult& dst)
 {
     dst.prop = src.prop;
     dst.cls_id = src.cls_id;
@@ -285,7 +285,7 @@ void CarpetDetectNode::convertToMsg(
 
     // // 1️⃣ 先写角点
     // for (const auto& c : src.coords) {
-    //     carpet_detect_msgs::CameraCoordinate pt;
+    //     base_detect_msgs::CameraCoordinate pt;
     //     pt.x = c.X;
     //     pt.y = c.Y;
     //     pt.z = c.Z;
@@ -294,7 +294,7 @@ void CarpetDetectNode::convertToMsg(
 
     // 2️⃣ 再写边缘点
     for (const auto& c : src.add_edge_point_single_pixel_camera_coordinates) {
-        carpet_detect_msgs::CameraCoordinate pt;
+        base_detect_msgs::CameraCoordinate pt;
         pt.x = c.X;
         pt.y = c.Y;
         pt.z = c.Z;
@@ -306,7 +306,7 @@ void CarpetDetectNode::convertToMsg(
 
 
 /* ============ ROS 参数监控线程 ============ */
-void CarpetDetectNode::rosparamMonitorLoop()
+void BaseDetectNode::rosparamMonitorLoop()
 {
     ros::Rate rate(1.0);  // 每秒读取一次
     while (ros::ok() && running_)
@@ -315,7 +315,7 @@ void CarpetDetectNode::rosparamMonitorLoop()
         if (nh_.getParam(infer_enable_param_, param_val))
         {
             infer_enable_ = param_val;
-            ROS_DEBUG("carpet_detect_enable = %d", infer_enable_);
+            ROS_DEBUG("base_detect_enable = %d", infer_enable_);
         }
         rate.sleep();
     }

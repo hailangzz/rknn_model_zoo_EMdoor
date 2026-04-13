@@ -7,15 +7,15 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "carpet_detect_interface.h"
-#include <carpet_detect_msgs/ObjectCameraDetectResultArray.h>
+#include "base_detect_interface.h"
+#include <base_detect_msgs/ObjectCameraDetectResultArray.h>
 
 
-class CarpetDetectNode
+class BaseDetectNode
 {
 public:
-    CarpetDetectNode(ros::NodeHandle& nh);
-    ~CarpetDetectNode();
+    BaseDetectNode(ros::NodeHandle& nh);
+    ~BaseDetectNode();
 
     void create_infer_thread();
 
@@ -47,6 +47,7 @@ private:
 
     /* ============ 检测功能开关 ============ */
     bool infer_enable_;                     // 私有推理开关
+    // const std::string infer_enable_param_ = "/task_manager/base_inspection_enable";  // ROS param 名
     const std::string infer_enable_param_ = "/task_manager/carpet_inspection_enable";  // ROS param 名
     std::thread rosparam_monitor_thread_;  // 新增：监控开关参数线程
 
@@ -63,7 +64,7 @@ private:
     ros::Publisher detect_result_pub_;
     const std::string detect_result_pub_topic_= "/camera_detect/object_camera_coordinates_results";
     // struct → msg 转换函数
-    void convertToMsg(const ObjectCameraDetectResult& src,carpet_detect_msgs::ObjectCameraDetectResult& dst);
+    void convertToMsg(const ObjectCameraDetectResult& src,base_detect_msgs::ObjectCameraDetectResult& dst);
 
     // 可视化图像发布器
     ros::Publisher debug_image_pub_;

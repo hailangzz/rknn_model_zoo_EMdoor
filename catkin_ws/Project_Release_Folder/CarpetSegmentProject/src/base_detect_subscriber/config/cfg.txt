@@ -10,7 +10,7 @@ score_threshold=0.7f
 //检测帧数阈值
 max_frame_threshold=3
 
-CARPET_AREA=60
+BASE_AREA=60
 
 //相机坐标系：远端Z轴比例缩放
 camera_z_axle_top_resize_rate=1.0

@@ -4,12 +4,12 @@
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "carpet_detect_ros_node");
+    ros::init(argc, argv, "base_detect_ros_node");
     ros::NodeHandle nh;
 
     try
     {
-        CarpetDetectNode node(nh);
+        BaseDetectNode node(nh);
         node.create_infer_thread();
         ros::spin();
     }

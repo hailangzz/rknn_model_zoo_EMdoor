@@ -14,9 +14,9 @@
   <build_depend>cv_bridge</build_depend>
   <build_depend>image_transport</build_depend>
 
-  <build_depend>carpet_detect_msgs</build_depend>
+  <build_depend>base_detect_msgs</build_depend>
   
-  <exec_depend>carpet_detect_msgs</exec_depend>
+  <exec_depend>base_detect_msgs</exec_depend>
 
   <exec_depend>roscpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
