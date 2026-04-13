@@ -5,7 +5,7 @@
 #include "postprocess.h"
 #include "types.h"
 #include <opencv2/opencv.hpp>
-#include "carpet_detect_interface.h"
+#include "base_detect_interface.h"
 
 class CameraParameters {
 public:

@@ -1,4 +1,4 @@
-#include "carpet_detect_interface.h"
+#include "base_detect_interface.h"
 #include "detect_context.h"
 
 #include <sys/stat.h>
@@ -8,7 +8,7 @@
 
 static DetectContext g_ctx;
 
-bool carpet_model_init(const char* config_path)
+bool base_model_init(const char* config_path)
 {
     if (g_ctx.initialized) {
         printf("carpet model already initialized");
@@ -33,7 +33,7 @@ static int save_index = 0;   // 静态自增计数器
 const char* save_dir = "./result_images";
 
 
-bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>& results)
+bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>& results)
 {
     results.clear();
 
@@ -167,7 +167,7 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
     return !results.empty();
 }
 
-void carpet_model_release()
+void base_model_release()
 {
     if (!g_ctx.initialized)
         return;

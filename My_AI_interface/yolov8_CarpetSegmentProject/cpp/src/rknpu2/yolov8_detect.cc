@@ -27,7 +27,7 @@ ConfigInfo readConfig(const std::string& filename) {
     
     cfg_values.score_threshold = std::stof(config["score_threshold"]); // 输入图片尺寸
     cfg_values.max_frame_threshold = std::stoi(config["max_frame_threshold"]);
-    cfg_values.CARPET_AREA = std::stoi(config["CARPET_AREA"]);
+    cfg_values.BASE_AREA = std::stoi(config["BASE_AREA"]);
 
     cfg_values.camera_z_axle_top_resize_rate = std::stof(config["camera_z_axle_top_resize_rate"]); // 相机坐标系，Z轴远端缩放比例
     cfg_values.camera_z_axle_polyfit_w0 = std::stof(config["camera_z_axle_polyfit_w0"]); 

@@ -33,9 +33,9 @@ typedef struct {
 } ObjectCameraDetectResult;
 
 
-bool carpet_model_init(const char* config_path);
-bool carpet_detect_infer(const cv::Mat& img,std::vector<ObjectCameraDetectResult>& results);
-void carpet_model_release();
+bool base_model_init(const char* config_path);
+bool base_detect_infer(const cv::Mat& img,std::vector<ObjectCameraDetectResult>& results);
+void base_model_release();
 
 #ifdef __cplusplus
 }

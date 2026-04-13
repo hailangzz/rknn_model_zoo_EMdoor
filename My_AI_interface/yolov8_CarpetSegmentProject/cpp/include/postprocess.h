@@ -11,7 +11,7 @@
 #include "rknn_matmul_api.h"
 #include <sys/time.h>
 #include "easy_timer.h"
-#include "carpet_detect_interface.h"
+#include "base_detect_interface.h"
 #define OBJ_NAME_MAX_SIZE 64
 #define OBJ_NUMB_MAX_SIZE 128
 #define OBJ_CLASS_NUM 1

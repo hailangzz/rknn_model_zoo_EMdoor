@@ -66,7 +66,7 @@ add_executable(${PROJECT_NAME}
     src/main.cc
     src/postprocess.cc
     src/transform_coordinates.cc
-    src/carpet_detect_interface.cc
+    src/base_detect_interface.cc
     ${rknpu_yolov8_file}
 )
 
@@ -104,7 +104,7 @@ endif()
 # Shared library (inference interface)
 # ============================================================
 add_library(rknn_carpet_detect SHARED
-    src/carpet_detect_interface.cc
+    src/base_detect_interface.cc
     src/postprocess.cc
     src/transform_coordinates.cc
     ${rknpu_yolov8_file}
@@ -138,7 +138,7 @@ endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(TARGETS rknn_carpet_detect DESTINATION lib)
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/carpet.jpg DESTINATION model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/base.jpg DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../config/cfg.txt DESTINATION config)
 

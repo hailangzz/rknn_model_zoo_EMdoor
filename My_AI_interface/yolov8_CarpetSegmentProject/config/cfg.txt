@@ -2,7 +2,7 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-model_path=./model/carpet_seg_f_v3.rknn
+model_path=./model/carpet_f_seg_v10.rknn
 input_width=640
 input_height=640
 score_threshold=0.7f
@@ -10,8 +10,8 @@ score_threshold=0.7f
 //检测帧数阈值
 max_frame_threshold=3
 
-//地毯的类别ID，于建图配合，设定地毯目标的重要程度
-CARPET_AREA=60
+//BASE的类别ID，于建图配合，设定BASE目标的重要程度
+BASE_AREA=60
 
 //相机坐标系：远端Z轴比例缩放
 camera_z_axle_top_resize_rate=1.0
