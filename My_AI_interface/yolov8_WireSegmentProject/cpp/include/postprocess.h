@@ -22,12 +22,12 @@
 #define PROTO_CHANNEL 32
 // #define PROTO_HEIGHT 160
 // #define PROTO_WEIGHT 160
-// #define PROTO_HEIGHT 240
-// #define PROTO_WEIGHT 240
+#define PROTO_HEIGHT 240
+#define PROTO_WEIGHT 240
 // #define PROTO_HEIGHT 240
 // #define PROTO_WEIGHT 144
-#define PROTO_HEIGHT 320
-#define PROTO_WEIGHT 320
+// #define PROTO_HEIGHT 320
+// #define PROTO_WEIGHT 320
 
 #define N_CLASS_COLORS 20
 

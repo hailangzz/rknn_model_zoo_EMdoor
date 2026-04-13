@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 INSTALL_PREFIX=$(cd "${SCRIPT_DIR}/../.." && pwd)
-PKG_SHARE=${INSTALL_PREFIX}/share/base_detect_subscriber
+PKG_SHARE=${INSTALL_PREFIX}/share/carpet_detect_subscriber
 
 echo "roscore 已在运行"
 echo "切换到包资源目录: ${PKG_SHARE}"
@@ -17,5 +17,5 @@ export LD_LIBRARY_PATH=${PKG_SHARE}/lib:$LD_LIBRARY_PATH
 # 设置ROS环境
 source ${INSTALL_PREFIX}/setup.bash
 
-echo "启动 main_base_detect_subscriber_node..."
-exec ${SCRIPT_DIR}/main_base_detect_subscriber_node
+echo "启动 main_carpet_detect_subscriber_node..."
+exec ${SCRIPT_DIR}/main_carpet_detect_subscriber_node

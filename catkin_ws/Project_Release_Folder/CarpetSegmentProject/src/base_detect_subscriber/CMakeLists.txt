@@ -44,6 +44,7 @@ add_executable(main_carpet_detect_subscriber_node
   src/subscriber_operation.cpp
 )
 
+# 修改此处的编译项目名称（main_carpet_detect_subscriber_node）以匹配上面 main_carpet_detect_subscriber_node 定义的名称
 set_target_properties(main_carpet_detect_subscriber_node PROPERTIES
   INSTALL_RPATH "$ORIGIN/../../share/carpet_detect_subscriber/lib"
   BUILD_WITH_INSTALL_RPATH TRUE
