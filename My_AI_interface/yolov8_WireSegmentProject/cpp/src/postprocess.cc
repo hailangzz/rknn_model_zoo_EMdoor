@@ -1670,6 +1670,7 @@ void fillCameraDetectResult(
     printf("edge_num = %d\n", edge_num);    
 }
 
+/*
 void filter_mask_contours(
     const std::vector<std::vector<cv::Point>> &input_contours, // 输入：原始轮廓集合（来自mask）
     std::vector<std::vector<cv::Point>> &output_contours)      // 输出：过滤+平滑后的轮廓
@@ -1736,4 +1737,69 @@ void filter_mask_contours(
         // -----------------------------
         output_contours.push_back(approx);
     }
+}*/
+
+void filter_mask_contours(
+    const std::vector<std::vector<cv::Point>> &input_contours,
+    std::vector<std::vector<cv::Point>> &output_contours)
+{
+    output_contours.clear();
+
+    for (const auto &cnt : input_contours)
+    {
+        // -----------------------------
+        // 1️⃣ 面积过滤（适配1920分辨率）
+        // -----------------------------
+        double area = cv::contourArea(cnt);
+
+        if (area < 50)   // ⭐ 原来200 → 改小（避免误杀远处/细线）
+            continue;
+
+        // -----------------------------
+        // 2️⃣ 外接矩形
+        // -----------------------------
+        cv::Rect rect = cv::boundingRect(cnt);
+
+        if (rect.width <= 0 || rect.height <= 0)
+            continue;
+
+        float fill_ratio = area / (rect.width * rect.height + 1e-5);
+
+        float length = std::max(rect.width, rect.height);
+        float thickness = std::min(rect.width, rect.height);
+
+        // -----------------------------
+        // 4️⃣ 周长过滤（弱化）
+        // -----------------------------
+        double perimeter = cv::arcLength(cnt, true);
+        if (perimeter < 30)   // ⭐ 原来50 → 放宽
+            continue;
+
+        // -----------------------------
+        // 5️⃣ 过滤逻辑（分情况）
+        // -----------------------------
+
+        if (fill_ratio < 0.05)
+            continue;
+
+        // -----------------------------
+        // 6️⃣ 多边形逼近（平滑）
+        // -----------------------------
+        std::vector<cv::Point> approx;
+
+        // 普通物体：正常平滑
+        cv::approxPolyDP(cnt, approx, 2.0, true);
+        
+        // -----------------------------
+        // 7️⃣ 防止点太少（避免异常）
+        // -----------------------------
+        if (approx.size() < 3)
+            continue;
+
+        // -----------------------------
+        // 8️⃣ 输出
+        // -----------------------------
+        output_contours.push_back(approx);
+    }
 }
+

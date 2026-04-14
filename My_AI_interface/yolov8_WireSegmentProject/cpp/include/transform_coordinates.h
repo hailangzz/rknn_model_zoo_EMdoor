@@ -51,123 +51,123 @@ struct ObjectSize3D {
 bool calcObjectSizeByAverage(ObjectCameraDetectResult& one,ObjectSize3D& size_out);
 
 
-// iou追踪模块
-struct Track
-{
-    int id;
-    cv::Rect2f box;
-    int lost_frames;   // 丢失帧数
-    int age;           // 存活时间
-};
+// // iou追踪模块
+// struct Track
+// {
+//     int id;
+//     cv::Rect2f box;
+//     int lost_frames;   // 丢失帧数
+//     int age;           // 存活时间
+// };
 
-class SimpleTracker
-{
-public:
-    SimpleTracker()
-    {
-        next_id = 0;
-    }
+// class SimpleTracker
+// {
+// public:
+//     SimpleTracker()
+//     {
+//         next_id = 0;
+//     }
 
-    void update(std::vector<ObjectCameraDetectResult>& detections)
-    {
-        std::vector<bool> matched_det(detections.size(), false);
+//     void update(std::vector<ObjectCameraDetectResult>& detections)
+//     {
+//         std::vector<bool> matched_det(detections.size(), false);
 
-        // ---------------------------
-        // 1️⃣ 匹配（IoU）
-        // ---------------------------
-        for (auto& track : tracks)
-        {
-            float best_iou = 0;
-            int best_idx = -1;
+//         // ---------------------------
+//         // 1️⃣ 匹配（IoU）
+//         // ---------------------------
+//         for (auto& track : tracks)
+//         {
+//             float best_iou = 0;
+//             int best_idx = -1;
 
-            for (int i = 0; i < detections.size(); i++)
-            {
-                if (matched_det[i]) continue;
+//             for (int i = 0; i < detections.size(); i++)
+//             {
+//                 if (matched_det[i]) continue;
 
-                float iou = compute_iou(track.box, toRect(detections[i]));
+//                 float iou = compute_iou(track.box, toRect(detections[i]));
 
-                if (iou > best_iou)
-                {
-                    best_iou = iou;
-                    best_idx = i;
-                }
-            }
+//                 if (iou > best_iou)
+//                 {
+//                     best_iou = iou;
+//                     best_idx = i;
+//                 }
+//             }
 
-            if (best_iou > 0.3)  // 👉 IoU阈值（可调）
-            {
-                // ✅ 匹配成功
-                track.box = toRect(detections[best_idx]);
-                track.lost_frames = 0;
-                track.age++;
+//             if (best_iou > 0.3)  // 👉 IoU阈值（可调）
+//             {
+//                 // ✅ 匹配成功
+//                 track.box = toRect(detections[best_idx]);
+//                 track.lost_frames = 0;
+//                 track.age++;
 
-                detections[best_idx].track_id = track.id;
-                matched_det[best_idx] = true;
-            }
-            else
-            {
-                //  没匹配
-                track.lost_frames++;
-            }
-        }
+//                 detections[best_idx].track_id = track.id;
+//                 matched_det[best_idx] = true;
+//             }
+//             else
+//             {
+//                 //  没匹配
+//                 track.lost_frames++;
+//             }
+//         }
 
-        // ---------------------------
-        // 2️⃣ 新目标
-        // ---------------------------
-        for (int i = 0; i < detections.size(); i++)
-        {
-            if (!matched_det[i])
-            {
-                Track new_track;
-                new_track.id = next_id++;
-                new_track.box = toRect(detections[i]);
-                new_track.lost_frames = 0;
-                new_track.age = 1;
+//         // ---------------------------
+//         // 2️⃣ 新目标
+//         // ---------------------------
+//         for (int i = 0; i < detections.size(); i++)
+//         {
+//             if (!matched_det[i])
+//             {
+//                 Track new_track;
+//                 new_track.id = next_id++;
+//                 new_track.box = toRect(detections[i]);
+//                 new_track.lost_frames = 0;
+//                 new_track.age = 1;
 
-                detections[i].track_id = new_track.id;
-                tracks.push_back(new_track);
-            }
-        }
+//                 detections[i].track_id = new_track.id;
+//                 tracks.push_back(new_track);
+//             }
+//         }
 
-        // ---------------------------
-        // 3️⃣ 删除丢失目标
-        // ---------------------------
-        tracks.erase(
-            std::remove_if(tracks.begin(), tracks.end(),
-                [](Track& t)
-                {
-                    return t.lost_frames > 10; // 👉 最大丢失帧
-                }),
-            tracks.end()
-        );
-    }
+//         // ---------------------------
+//         // 3️⃣ 删除丢失目标
+//         // ---------------------------
+//         tracks.erase(
+//             std::remove_if(tracks.begin(), tracks.end(),
+//                 [](Track& t)
+//                 {
+//                     return t.lost_frames > 10; // 👉 最大丢失帧
+//                 }),
+//             tracks.end()
+//         );
+//     }
 
-private:
-    std::vector<Track> tracks;
-    int next_id;
+// private:
+//     std::vector<Track> tracks;
+//     int next_id;
 
-    cv::Rect2f toRect(const ObjectCameraDetectResult& det)
-    {
-        return cv::Rect2f(
-            det.target_box.left,
-            det.target_box.top,
-            det.target_box.right - det.target_box.left,
-            det.target_box.bottom - det.target_box.top
-        );
-    }
+//     cv::Rect2f toRect(const ObjectCameraDetectResult& det)
+//     {
+//         return cv::Rect2f(
+//             det.target_box.left,
+//             det.target_box.top,
+//             det.target_box.right - det.target_box.left,
+//             det.target_box.bottom - det.target_box.top
+//         );
+//     }
 
-    float compute_iou(const cv::Rect2f& a, const cv::Rect2f& b)
-    {
-        float xx1 = std::max(a.x, b.x);
-        float yy1 = std::max(a.y, b.y);
-        float xx2 = std::min(a.x + a.width,  b.x + b.width);
-        float yy2 = std::min(a.y + a.height, b.y + b.height);
+//     float compute_iou(const cv::Rect2f& a, const cv::Rect2f& b)
+//     {
+//         float xx1 = std::max(a.x, b.x);
+//         float yy1 = std::max(a.y, b.y);
+//         float xx2 = std::min(a.x + a.width,  b.x + b.width);
+//         float yy2 = std::min(a.y + a.height, b.y + b.height);
 
-        float w = std::max(0.0f, xx2 - xx1);
-        float h = std::max(0.0f, yy2 - yy1);
+//         float w = std::max(0.0f, xx2 - xx1);
+//         float h = std::max(0.0f, yy2 - yy1);
 
-        float inter = w * h;
-        float union_area = a.area() + b.area() - inter;
+//         float inter = w * h;
+//         float union_area = a.area() + b.area() - inter;
 
-        return union_area > 0 ? inter / union_area : 0;
-    }
-};
+//         return union_area > 0 ? inter / union_area : 0;
+//     }
+// };

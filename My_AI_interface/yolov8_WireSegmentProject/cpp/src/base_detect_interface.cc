@@ -7,7 +7,7 @@
 #include "image_drawing.h"
 
 static DetectContext g_ctx;      // 全局上下文实例
-static SimpleTracker g_tracker;  // 全局追踪器实例
+// static SimpleTracker g_tracker;  // 全局追踪器实例
 
 bool base_model_init(const char* config_path)
 {
@@ -163,8 +163,8 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
     }
 
-    // ⭐⭐⭐ Tracking 在这里 ⭐⭐⭐
-    g_tracker.update(results);
+    // // ⭐⭐⭐ Tracking 在这里 ⭐⭐⭐
+    // g_tracker.update(results);
     
     // 👉 ⭐⭐⭐ 释放检测结果内存占用 ⭐⭐⭐
     for (int i = 0; i < od_results.count; i++)
