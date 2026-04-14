@@ -5,8 +5,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "image_drawing.h"
+#include "tracker.h"
 
 static DetectContext g_ctx;      // 全局上下文实例
+static MotionTracker g_tracker;
 
 bool base_model_init(const char* config_path)
 {
@@ -145,8 +147,12 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         // printf("%d\n", det->box.right);
         // printf("%d\n", det->box.bottom);
 
+        // ⭐ 初始化 track_id（防止未赋值）
+        one.track_id = -1;
+
         results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
         
+
         // 边框合法性校验：
         ObjectSize3D size;
         if (calcObjectSizeByAverage(one, size)) {
@@ -154,7 +160,8 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         }
     }
 
-    
+    // ⭐⭐⭐ 这里加入 tracking ⭐⭐⭐
+    g_tracker.update(results);
     // 调试输出
     // 打印总数量
     printf("od_results.count: %d\n", od_results.count);

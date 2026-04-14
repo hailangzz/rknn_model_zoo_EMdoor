@@ -6,7 +6,8 @@
 #include <unistd.h>
 #include "image_drawing.h"
 
-static DetectContext g_ctx;      // 全局上下文实例
+static DetectContext g_ctx;
+static MotionTracker g_tracker;
 
 bool base_model_init(const char* config_path)
 {
@@ -98,9 +99,8 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         
         //获取模型推理，mark轮廓点集数组信息。
         // extract_seg_mask_contours(od_results, i, src_image.width, src_image.height, contours_mark_point);
-        // 获取 mask 轮廓。推理的结果是基于原始图像尺寸的（而非输入模型的缩放尺寸），因此这里传入原图的宽高。
+        // 获取 mask 轮廓
         extract_seg_mask_contours(seg, src_image.width, src_image.height, contours_mark_point);
-        // extract_seg_mask_contours(seg, g_ctx.config.input_width, g_ctx.config.input_height, contours_mark_point);
 
         int total_points = 0;
         for (const auto& contour : contours_mark_point) {
@@ -145,8 +145,11 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         // printf("%d\n", det->box.right);
         // printf("%d\n", det->box.bottom);
 
-        results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
-        
+        // ⭐ 初始化 track_id（防止未赋值）
+        one.track_id = -1;
+
+        results.push_back(one); 
+
         // 边框合法性校验：
         ObjectSize3D size;
         if (calcObjectSizeByAverage(one, size)) {
@@ -154,6 +157,8 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         }
     }
 
+    // ⭐⭐⭐ 这里加入 tracking ⭐⭐⭐
+    g_tracker.update(results);
     
     // 调试输出
     // 打印总数量
@@ -162,7 +167,6 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         auto& det = results[i];
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
     }
-
 
     // 👉 ⭐⭐⭐ 释放检测结果内存占用 ⭐⭐⭐
     for (int i = 0; i < od_results.count; i++)
@@ -173,8 +177,10 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
             od_results.results_seg[i].seg_mask = NULL;
         }
     }
+    
 
     free(src_image.virt_addr);
+
     return !results.empty();
 }
 
