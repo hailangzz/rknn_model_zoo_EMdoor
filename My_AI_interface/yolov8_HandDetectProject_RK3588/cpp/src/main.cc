@@ -206,7 +206,7 @@ int main(int argc, char **argv)
     // 转换为 RGB
     // auto img_rgb = std::make_shared<cv::Mat>();
     // cv::cvtColor(*mat_img, *img_rgb, cv::COLOR_BGR2RGB);
-    HandDetectResult results = hand_detect_interface(mat_img, true);
+    HandDetectResult results = hand_detect_interface(mat_img, HandDetectCameraInfo::BottomHandCamera, true);
     
     std::cout << "HandDetect result: ";
     PrintHandDetectResult(results);

@@ -18,14 +18,19 @@ max_frame_threshold=1
 debug_nv21_image_saver=/tmp
 
 //椭圆区域有效区域：1280*720
-center_x=540
-center_y=337
-axes_w=290
-axes_h=300
+top_center_x=555
+top_center_y=365
+top_axes_w=290
+top_axes_h=310
+
+bottom_center_x=625
+bottom_center_y=290
+bottom_axes_w=270
+bottom_axes_h=250
 
 
 //手势目标框与货架平台，重叠区域占目标框比例阈值
-target_effective_area_iou_thread=0.08
+target_effective_area_iou_thread=0.1
 target_bbox_center_box_area_threshold=0.3
 
 //检测到手部目标，最大的持续时长（大于持续持续时长后，屏蔽block_duration_s秒）

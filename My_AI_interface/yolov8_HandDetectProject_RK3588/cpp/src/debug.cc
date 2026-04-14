@@ -75,7 +75,7 @@ bool DebugNv21Saver::ensureDirectory(const std::string& dir)
 }
 
 // --------------------- 文件名生成 ---------------------
-std::string DebugNv21Saver::generateFileName()
+std::string DebugNv21Saver::generateFileName(HandDetectCameraInfo camera_info)
 {
     std::ostringstream oss;
     // oss << save_dir_
@@ -83,7 +83,11 @@ std::string DebugNv21Saver::generateFileName()
     //     << std::setw(5) << std::setfill('0') << frame_count_
     //     << ".jpg";            // 存储手势检测，结果图片存储路径；
 
-    oss << save_dir_<< "/hand_detect_result.jpg"; // 写死手势检测图片存储名称；
+    if (camera_info == HandDetectCameraInfo::TopHandCamera) {
+        oss << save_dir_<< "/top_hand_detect_result.jpg"; // 写死手势检测图片存储名称；
+    } else if (camera_info == HandDetectCameraInfo::BottomHandCamera) {
+        oss << save_dir_<< "/bottom_hand_detect_result.jpg"; // 写死手势检测图片存储名称；
+    }
 
     frame_count_++;
     return oss.str();
@@ -91,7 +95,7 @@ std::string DebugNv21Saver::generateFileName()
 
 
 
-void DebugNv21Saver::saveRgbFrameDetect(image_buffer_t* img, std::vector<object_detect_result>& results)
+void DebugNv21Saver::saveRgbFrameDetect(image_buffer_t* img, std::vector<object_detect_result>& results, HandDetectCameraInfo camera_info)
 {
 
     if (!img || !img->virt_addr) {
@@ -147,7 +151,7 @@ void DebugNv21Saver::saveRgbFrameDetect(image_buffer_t* img, std::vector<object_
             draw_text(img, x1, std::max(0, y1 - 5), text, COLOR_RED);
             */
         }
-        std::string filename = generateFileName();
+        std::string filename = generateFileName(camera_info);
         write_image(filename.c_str(), img);
 
     } catch (const std::exception& e) {

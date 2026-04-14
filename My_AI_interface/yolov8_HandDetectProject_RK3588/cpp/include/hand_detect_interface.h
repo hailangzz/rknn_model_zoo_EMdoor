@@ -11,8 +11,13 @@ enum class HandDetectResult {
     HandDetected  // 本帧处理完成，检测到手
 };
 
+enum class HandDetectCameraInfo {
+    TopHandCamera,   // 上一帧还未处理完成
+    BottomHandCamera // 下一帧还未处理完成    
+};
+
 // ================= 配置接口 =================
 void hand_detect_set_config_path(const std::string& path);
 
 // ================= 推荐主接口（OpenCV Mat 共享指针） =================
-HandDetectResult hand_detect_interface(std::shared_ptr<cv::Mat> image_object_input,bool is_save_images); 
+HandDetectResult hand_detect_interface(std::shared_ptr<cv::Mat> image_object_input,HandDetectCameraInfo camera_info,bool is_save_images); 

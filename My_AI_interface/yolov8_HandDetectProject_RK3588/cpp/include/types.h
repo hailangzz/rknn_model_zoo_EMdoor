@@ -42,10 +42,16 @@ struct ConfigInfo {
     float score_threshold;
     int max_frame_threshold;
     std::string debug_nv21_image_saver;
-    int center_x;
-    int center_y;
-    int axes_w;
-    int axes_h;
+    int top_center_x;
+    int top_center_y;
+    int top_axes_w;
+    int top_axes_h;
+    int bottom_center_x;
+    int bottom_center_y;
+    int bottom_axes_w;
+    int bottom_axes_h;
+
+
     float target_effective_area_iou_thread;
     float target_bbox_center_box_area_threshold;
     float max_detect_duration_s;  

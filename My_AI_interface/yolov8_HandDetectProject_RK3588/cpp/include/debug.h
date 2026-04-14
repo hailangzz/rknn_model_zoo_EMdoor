@@ -15,11 +15,11 @@ public:
     explicit DebugNv21Saver(const std::string& save_dir);
 
     // 将 NV21 保存为 JPG
-    void saveRgbFrameDetect(image_buffer_t* img,std::vector<object_detect_result>& results);
+    void saveRgbFrameDetect(image_buffer_t* img,std::vector<object_detect_result>& results, HandDetectCameraInfo camera_info);
 
 private:
     bool ensureDirectory(const std::string& dir);
-    std::string generateFileName();
+    std::string generateFileName(HandDetectCameraInfo camera_info);
     cv::Mat plotDetectBoxsMat(cv::Mat & image_mat,const std::vector<object_detect_result>& boxes);
     void drawPalmBoxes(cv::Mat& image, const std::vector<object_detect_result>& boxes);
 private:

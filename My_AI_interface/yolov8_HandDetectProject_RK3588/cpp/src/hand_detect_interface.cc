@@ -60,6 +60,7 @@ struct timeval start_time, stop_time;
 
 HandDetectResult hand_detect_interface(
     std::shared_ptr<cv::Mat> image_object_input,
+    HandDetectCameraInfo camera_info,
     bool is_save_images
 ) {
     try {        
@@ -105,31 +106,51 @@ HandDetectResult hand_detect_interface(
             std::lock_guard<std::mutex> debug_lock(debug_mutex);
             getDebugSaver().saveRgbFrameDetect(
                 &img_buf,
-                detector.object_detect_result_list_
+                detector.object_detect_result_list_,
+                camera_info
             );
         }
 
+        float center_x, center_y, axes_w, axes_h;
+        if (camera_info == HandDetectCameraInfo::TopHandCamera) {
+            center_x = getConfig().top_center_x;
+            center_y = getConfig().top_center_y;
+            axes_w   = getConfig().top_axes_w;
+            axes_h   = getConfig().top_axes_h;
+        }
+        else if (camera_info == HandDetectCameraInfo::BottomHandCamera) {
+            center_x = getConfig().bottom_center_x;
+            center_y = getConfig().bottom_center_y;
+            axes_w   = getConfig().bottom_axes_w;
+            axes_h   = getConfig().bottom_axes_h;
+        }        
+        else {
+            LOGE("Unknown camera_info!");
+            return HandDetectResult::NoHand;
+        }
+        // printf("center_x=%f, center_y=%f, axes_w=%f, axes_h=%f\n", center_x, center_y, axes_w, axes_h);
         // ---------- 3. 区域过滤 ----------
         std::vector<object_detect_result> filtered_results;
         {
             std::lock_guard<std::mutex> lock(detector_mutex);
-            for (const auto& obj : detector.object_detect_result_list_) {
-                const image_rect_t& box = obj.box;
+            for (const auto& obj : detector.object_detect_result_list_) 
+                {
+                    const image_rect_t& box = obj.box;
 
-                bool valid = bboxEllipseOverlapRatio(
-                    box.left, box.top, box.right, box.bottom,
-                    getConfig().center_x,
-                    getConfig().center_y,
-                    getConfig().axes_w,
-                    getConfig().axes_h,
-                    getConfig().target_effective_area_iou_thread,
-                    getConfig().target_bbox_center_box_area_threshold,
-                    20
-                );
+                    bool valid = bboxEllipseOverlapRatio(
+                        box.left, box.top, box.right, box.bottom,
+                        center_x,
+                        center_y,
+                        axes_w,
+                        axes_h,
+                        getConfig().target_effective_area_iou_thread,
+                        getConfig().target_bbox_center_box_area_threshold,
+                        20
+                    );
 
-                if (valid)
-                    filtered_results.push_back(obj);
-            }
+                    if (valid)
+                        filtered_results.push_back(obj);
+                }          
         }
 
         {

@@ -53,10 +53,15 @@ ConfigInfo readConfig(const std::string& filename) {
     cfg_values.max_frame_threshold = std::stoi(config["max_frame_threshold"]);
     cfg_values.debug_nv21_image_saver = config.at("debug_nv21_image_saver");
     
-    cfg_values.center_x = std::stoi(config["center_x"]);
-    cfg_values.center_y  = std::stoi(config["center_y"]);
-    cfg_values.axes_w  = std::stoi(config["axes_w"]);
-    cfg_values.axes_h  = std::stoi(config["axes_h"]);
+    cfg_values.top_center_x = std::stoi(config["top_center_x"]);
+    cfg_values.top_center_y  = std::stoi(config["top_center_y"]);
+    cfg_values.top_axes_w  = std::stoi(config["top_axes_w"]);
+    cfg_values.top_axes_h  = std::stoi(config["top_axes_h"]);
+    cfg_values.bottom_center_x = std::stoi(config["bottom_center_x"]);
+    cfg_values.bottom_center_y  = std::stoi(config["bottom_center_y"]);
+    cfg_values.bottom_axes_w  = std::stoi(config["bottom_axes_w"]);
+    cfg_values.bottom_axes_h  = std::stoi(config["bottom_axes_h"]);
+    
     cfg_values.target_effective_area_iou_thread = std::stof(config["target_effective_area_iou_thread"]);
     cfg_values.target_bbox_center_box_area_threshold = std::stof(config["target_bbox_center_box_area_threshold"]);
     cfg_values.max_detect_duration_s  = std::stof(config["max_detect_duration_s"]);
