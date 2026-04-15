@@ -21,6 +21,7 @@ bool base_model_init(const char* config_path)
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
     
+    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images);
     g_ctx.initialized = true;
 
     printf("carpet_model_init success");
@@ -153,6 +154,14 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         }
     }
 
+    if (!results.empty() && g_ctx.debuger) {
+        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
+        printf("save image success!!");
+        }
+    else{
+        printf("save image fall!!");
+    }
+
     // 调试输出
     // 打印总数量
     printf("od_results.count: %d\n", od_results.count);
@@ -160,7 +169,17 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         auto& det = results[i];
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
     }
-    
+
+
+    // 👉 ⭐⭐⭐ 释放检测结果内存占用 ⭐⭐⭐
+    for (int i = 0; i < od_results.count; i++)
+    {
+        if (od_results.results_seg[i].seg_mask)
+        {
+            free(od_results.results_seg[i].seg_mask);
+            od_results.results_seg[i].seg_mask = NULL;
+        }
+    }
 
     free(src_image.virt_addr);
 
@@ -176,9 +195,11 @@ void base_model_release()
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
+    delete g_ctx.debuger;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
+    g_ctx.debuger = nullptr;
     g_ctx.initialized = false;
 
     printf("carpet_model_release finished");

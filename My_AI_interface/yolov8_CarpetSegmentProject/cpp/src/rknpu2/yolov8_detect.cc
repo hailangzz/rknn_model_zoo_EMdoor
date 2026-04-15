@@ -50,6 +50,10 @@ ConfigInfo readConfig(const std::string& filename) {
     cfg_values.camera_D_6 = std::stof(config["camera_D_6"]);
     cfg_values.camera_D_7 = std::stof(config["camera_D_7"]);
 
+    cfg_values.save_debug_images_path = config["save_debug_images_path"];
+    cfg_values.is_save_debug_images = (config["is_save_debug_images"] == "true");
+    
+
     return cfg_values;
 }
 

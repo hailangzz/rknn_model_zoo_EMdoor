@@ -67,6 +67,7 @@ add_executable(${PROJECT_NAME}
     src/postprocess.cc
     src/transform_coordinates.cc
     src/base_detect_interface.cc
+    src/debug.cc
     ${rknpu_yolov8_file}
 )
 
@@ -107,6 +108,7 @@ add_library(rknn_carpet_detect SHARED
     src/base_detect_interface.cc
     src/postprocess.cc
     src/transform_coordinates.cc
+    src/debug.cc
     ${rknpu_yolov8_file}
 )
 

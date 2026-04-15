@@ -63,6 +63,8 @@ struct ConfigInfo {
     float camera_D_5;
     float camera_D_6;
     float camera_D_7;
+    std::string save_debug_images_path;
+    bool is_save_debug_images;
 
 };
 
