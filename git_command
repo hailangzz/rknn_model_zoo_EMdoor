@@ -17,3 +17,8 @@
   git checkout main
   git merge new_branch
   git push origin main
+
+  // git恢复文件夹内容，到指定提交
+  git restore --source <commit_id> path/to/folder/
+
+  git restore --source other-branch path/to/folder/
