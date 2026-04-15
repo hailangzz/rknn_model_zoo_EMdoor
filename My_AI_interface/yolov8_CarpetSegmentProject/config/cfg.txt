@@ -38,3 +38,4 @@ camera_D_7=0.024653
 //debug配置管理
 save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/CarpetSegmentProject/images
 is_save_debug_images=true
+fps_limit=5

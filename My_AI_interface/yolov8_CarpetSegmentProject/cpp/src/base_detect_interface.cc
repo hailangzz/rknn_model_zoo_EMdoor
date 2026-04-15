@@ -21,7 +21,7 @@ bool base_model_init(const char* config_path)
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
     
-    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images);
+    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images,g_ctx.config.fps_limit);
     g_ctx.initialized = true;
 
     printf("carpet_model_init success");

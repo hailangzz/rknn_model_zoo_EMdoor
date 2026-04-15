@@ -65,6 +65,7 @@ struct ConfigInfo {
     float camera_D_7;
     std::string save_debug_images_path;
     bool is_save_debug_images;
+    int fps_limit;
 
 };
 

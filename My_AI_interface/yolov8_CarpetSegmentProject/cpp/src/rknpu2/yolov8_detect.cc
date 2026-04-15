@@ -52,6 +52,7 @@ ConfigInfo readConfig(const std::string& filename) {
 
     cfg_values.save_debug_images_path = config["save_debug_images_path"];
     cfg_values.is_save_debug_images = (config["is_save_debug_images"] == "true");
+    cfg_values.fps_limit = std::stoi(config["fps_limit"]);
     
 
     return cfg_values;
