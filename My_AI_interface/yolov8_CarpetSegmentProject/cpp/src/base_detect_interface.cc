@@ -29,9 +29,6 @@ bool base_model_init(const char* config_path)
 }
 
 // ================= 保存结果图像 =================
-static int save_index = 0;   // 静态自增计数器
-
-const char* save_dir = "./result_images";
 
 
 bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>& results)
@@ -86,10 +83,17 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         return false;
     }
 
+    float box_max_prop = std::numeric_limits<float>::min();
     // 遍历检测结果
-    for (int i = 0; i < od_results.count; i++) {
+    for (int i = 0; i < od_results.count; i++) {        
 
         object_detect_result* det = &od_results.results[i];
+        box_max_prop = std::max(box_max_prop, det->prop);
+        // 先过滤，只提取高阈值的
+        if (det->prop < g_ctx.config.score_threshold) {
+                continue;
+            }
+
         object_segment_result*seg = &od_results.results_seg[i];
         ObjectCameraDetectResult one;        
 
@@ -154,14 +158,11 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         }
     }
 
-    if (!results.empty() && g_ctx.debuger) {
-        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
-        printf("save image success!!");
-        }
-    else{
-        printf("save image fall!!");
+    // 当检测到的目标中，最大概率的框体，概率值大于debug时，给定的概率阈值，则保存此图像
+    if (box_max_prop > g_ctx.config.debug_score_threshold) {
+        g_ctx.debuger->saveIfDetected(img, "carpet_detect");        
     }
-
+    
     // 调试输出
     // 打印总数量
     printf("od_results.count: %d\n", od_results.count);
