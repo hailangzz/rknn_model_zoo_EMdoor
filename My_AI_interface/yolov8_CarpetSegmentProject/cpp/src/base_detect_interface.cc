@@ -160,7 +160,17 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         auto& det = results[i];
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
     }
-    
+
+
+    // 👉 ⭐⭐⭐ 释放检测结果内存占用 ⭐⭐⭐
+    for (int i = 0; i < od_results.count; i++)
+    {
+        if (od_results.results_seg[i].seg_mask)
+        {
+            free(od_results.results_seg[i].seg_mask);
+            od_results.results_seg[i].seg_mask = NULL;
+        }
+    }
 
     free(src_image.virt_addr);
 
