@@ -35,14 +35,14 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
 {
     results.clear();
 
-    if (!g_ctx.initialized || img.empty()) {
+    // ================= 安全检查 =================
+    if (!g_ctx.initialized || !g_ctx.detector || !g_ctx.camera_params || img.empty()) {
         printf("model not initialized or empty image\n");
         return false;
     }
 
+    // ================= Mat 处理 =================
     cv::Mat img_rgb;
-
-    // 如果原图是 4 通道 RGBA，转换为 RGB
     if (img.channels() == 4) {
         cv::cvtColor(img, img_rgb, cv::COLOR_RGBA2RGB);
     } else if (img.channels() == 1) {
@@ -51,31 +51,32 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         img_rgb = img;
     }
 
+    if (!img_rgb.isContinuous()) {
+        img_rgb = img_rgb.clone();
+    }
+
+    // ================= 构造输入 =================
     image_buffer_t src_image;
     memset(&src_image, 0, sizeof(image_buffer_t));
 
     size_t buffer_size = img_rgb.total() * img_rgb.elemSize();
 
-    // 使用 posix_memalign 分配对齐内存，避免 RGA 偶发日志
     if (posix_memalign((void**)&src_image.virt_addr, 64, buffer_size) != 0) {
         printf("failed to allocate aligned memory\n");
         return false;
     }
 
-    // 初始化缓冲区
-    memset(src_image.virt_addr, 0, buffer_size);
-
-    // 拷贝图像数据
     memcpy(src_image.virt_addr, img_rgb.data, buffer_size);
 
     src_image.width  = img_rgb.cols;
     src_image.height = img_rgb.rows;
-    src_image.format = IMAGE_FORMAT_RGB888; // 确保 RGA / NPU 支持
+    src_image.format = IMAGE_FORMAT_RGB888;
     src_image.size   = buffer_size;
 
+    // ================= 推理 =================
     object_detect_result_list od_results;
+    memset(&od_results, 0, sizeof(od_results));
 
-    // YOLOv8 推理
     int ret = g_ctx.detector->inference_yolov8_model(&src_image, &od_results);
     if (ret != 0) {
         printf("yolov8 inference failed\n");
@@ -83,109 +84,110 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         return false;
     }
 
-    float box_max_prop = std::numeric_limits<float>::min();
-    // 遍历检测结果
-    for (int i = 0; i < od_results.count; i++) {        
+    // ================= 统计 =================
+    float box_max_prop = std::numeric_limits<float>::lowest();
+
+    // ================= 遍历检测结果 =================
+    for (int i = 0; i < od_results.count; i++) {
+
+        // ---------- results 安全 ----------
+        if (!od_results.results) {
+            printf("results is null!\n");
+            break;
+        }
 
         object_detect_result* det = &od_results.results[i];
+
+        // ---------- 最大置信度 ----------
         box_max_prop = std::max(box_max_prop, det->prop);
-        // 先过滤，只提取高阈值的
+
+        // ---------- 阈值过滤 ----------
         if (det->prop < g_ctx.config.score_threshold) {
-                continue;
-            }
+            continue;
+        }
 
-        object_segment_result*seg = &od_results.results_seg[i];
-        ObjectCameraDetectResult one;        
+        // ---------- seg 安全 ----------
+        if (!od_results.results_seg) {
+            printf("results_seg is null!\n");
+            continue;
+        }
 
-        std::vector<std::vector<cv::Point>> contours_mark_point;   // 存储轮廓点集
-        std::vector<std::vector<cv::Point>> contours_mark_point_smoothed;   // 存储轮廓点集（平滑后）
-        std::vector<std::vector<cv::Point>> contours_mark_point_filtered;   // 存储过滤后的轮廓点集
-        
-        //获取模型推理，mark轮廓点集数组信息。
-        // extract_seg_mask_contours(od_results, i, src_image.width, src_image.height, contours_mark_point);
-        // 获取 mask 轮廓
-        extract_seg_mask_contours(seg, src_image.width, src_image.height, contours_mark_point);
+        object_segment_result* seg = &od_results.results_seg[i];
+        if (!seg) {
+            printf("seg ptr invalid!\n");
+            continue;
+        }
+
+        ObjectCameraDetectResult one;
+
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<std::vector<cv::Point>> contours_filtered;
+        std::vector<std::vector<cv::Point>> contours_smoothed;
+
+        // ---------- 提取轮廓 ----------
+        extract_seg_mask_contours(seg, src_image.width, src_image.height, contours);
 
         int total_points = 0;
-        for (const auto& contour : contours_mark_point) {
-            total_points += contour.size();
+        for (const auto& c : contours) {
+            total_points += c.size();
         }
-        printf("det[%d] filtered total points = %d\n", i, total_points);
+        printf("det[%d] total points = %d\n", i, total_points);
 
-        filter_mask_contours(contours_mark_point, contours_mark_point_filtered); // 过滤轮廓点集（去除小面积、长宽比异常的轮廓）
-        // one.object_contours_mark_point = contours_mark_point;     // 边界点数组赋值
+        // ---------- 过滤 ----------
+        filter_mask_contours(contours, contours_filtered);
 
-        contours_mark_point_smoothed.resize(contours_mark_point_filtered.size());   // 防止数组越界
-        for (size_t j = 0; j < contours_mark_point_filtered.size(); j++)
-        {
-            smoothContour(contours_mark_point_filtered[j], contours_mark_point_smoothed[j]);
+        // ---------- 平滑 ----------
+        contours_smoothed.resize(contours_filtered.size());
+        for (size_t j = 0; j < contours_filtered.size(); j++) {
+            smoothContour(contours_filtered[j], contours_smoothed[j]);
         }
-        
-        // 👉 存储
-        one.object_contours_mark_point = contours_mark_point_filtered;
-        
-        memset(&det->camera_coordinates, 0, sizeof(box_camera_coordinates)); //初始化
 
-        
+        // ---------- 存储 ----------
+        one.object_contours_mark_point = contours_filtered;
 
-        // 坐标转换 （转换为，原始未矫正的，xyz尺寸值）
-        g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_mark_point_filtered);
-        
-        
-        fillCameraDetectResult(det, one, g_ctx.config); // 结果值填充
+        memset(&det->camera_coordinates, 0, sizeof(box_camera_coordinates));
 
-        // // 安全打印
-        // auto &coord = det->camera_coordinates;
-        // printf("Left Bottom: X=%f Y=%f Z=%f\n",
-        //     coord.left_bottom.X, coord.left_bottom.Y, coord.left_bottom.Z);
-        // printf("Right Bottom: X=%f Y=%f Z=%f\n",
-        //     coord.right_bottom.X, coord.right_bottom.Y, coord.right_bottom.Z);
-        // printf("Right Top: X=%f Y=%f Z=%f\n",
-        //     coord.right_top.X, coord.right_top.Y, coord.right_top.Z);
-        // printf("Left Top: X=%f Y=%f Z=%f\n",
-        //     coord.left_top.X, coord.left_top.Y, coord.left_top.Z);
-        // printf("%d\n", det->box.left);
-        // printf("%d\n", det->box.top);
-        // printf("%d\n", det->box.right);
-        // printf("%d\n", det->box.bottom);
+        g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_filtered);
 
-        results.push_back(one); 
+        fillCameraDetectResult(det, one, g_ctx.config);
 
-        // 边框合法性校验：
+        results.push_back(one);
+
+        // ---------- 尺寸计算 ----------
         ObjectSize3D size;
-        if (calcObjectSizeByAverage(one, size)) {
-            // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
-        }
+        calcObjectSizeByAverage(one, size);
     }
 
-    // 当检测到的目标中，最大概率的框体，概率值大于debug时，给定的概率阈值，则保存此图像
-    if (box_max_prop > g_ctx.config.debug_score_threshold) {
-        g_ctx.debuger->saveIfDetected(img, "carpet_detect");        
+    // ================= Debug 保存 =================
+    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold) {
+        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
     }
-    
-    // 调试输出
-    // 打印总数量
+
+    // ================= Debug 输出 =================
     printf("od_results.count: %d\n", od_results.count);
-    for (int i = 0; i < od_results.count; i++) {
-        auto& det = results[i];
-        printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
+
+    for (size_t i = 0; i < results.size(); i++) {
+        printf("det.cls_id:%d, det.prop:%f\n",
+               results[i].cls_id,
+               results[i].prop);
     }
 
-
-    // 👉 ⭐⭐⭐ 释放检测结果内存占用 ⭐⭐⭐
-    for (int i = 0; i < od_results.count; i++)
-    {
-        if (od_results.results_seg[i].seg_mask)
-        {
-            free(od_results.results_seg[i].seg_mask);
-            od_results.results_seg[i].seg_mask = NULL;
+    // ================= 释放 seg_mask（⚠️需确认） =================
+    if (od_results.results_seg) {
+        for (int i = 0; i < od_results.count; i++) {
+            if (od_results.results_seg[i].seg_mask) {
+                free(od_results.results_seg[i].seg_mask);
+                od_results.results_seg[i].seg_mask = nullptr;
+            }
         }
     }
 
+    // ================= 释放输入 =================
     free(src_image.virt_addr);
 
     return !results.empty();
 }
+
 
 void base_model_release()
 {
