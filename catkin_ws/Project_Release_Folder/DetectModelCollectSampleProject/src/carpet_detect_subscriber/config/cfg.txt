@@ -2,9 +2,13 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-model_path=./model/carpet_f_v3.rknn
-input_width=640
-input_height=640
+//model_path=./model/carpet_f_v3.rknn
+//input_width=640
+//input_height=640
+
+model_path=./model/hand_f_v3_3588_0313.rknn
+input_width=416
+input_height=416
 
 score_threshold=0.7f
 
