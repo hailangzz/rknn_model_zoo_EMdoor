@@ -32,7 +32,8 @@ bool carpet_model_init(const char* config_path)
 
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
-    
+    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images,g_ctx.config.fps_limit);
+
     g_ctx.initialized = true;
 
     printf("carpet_model_init success");
@@ -96,10 +97,15 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
         return false;
     }
 
+    // ================= 统计 =================
+    float box_max_prop = std::numeric_limits<float>::lowest();
     // 遍历检测结果
     for (int i = 0; i < od_results.count; i++) {
         object_detect_result* det = &od_results.results[i];
         ObjectCameraDetectResult one;
+
+        // ---------- 最大置信度 ----------
+        box_max_prop = std::max(box_max_prop, det->prop);
 
         // 坐标转换 （转换为，原始未矫正的，xyz尺寸值）
         g_ctx.camera_params->ObjectboxToCameraXYZ(det->box, det->camera_coordinates);
@@ -159,6 +165,11 @@ bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResul
         if (calcObjectSizeByAverage(one, size)) {
             // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
         }
+    }
+
+    // ================= Debug 保存 =================
+    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold) {
+        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
     }
 
     // // 调试输出
@@ -265,9 +276,12 @@ void carpet_model_release()
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
+    delete g_ctx.debuger;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
+    g_ctx.debuger = nullptr;
+
     g_ctx.initialized = false;
 
     printf("carpet_model_release finished");
