@@ -1752,7 +1752,7 @@ void filter_mask_contours(
         // -----------------------------
         double area = cv::contourArea(cnt);
 
-        if (area < 50)   // ⭐ 原来200 → 改小（避免误杀远处/细线）
+        if (area < 200)   // ⭐ 原来200 → 改小（避免误杀远处/细线）
             continue;
 
         // -----------------------------
@@ -1772,7 +1772,7 @@ void filter_mask_contours(
         // 4️⃣ 周长过滤（弱化）
         // -----------------------------
         double perimeter = cv::arcLength(cnt, true);
-        if (perimeter < 30)   // ⭐ 原来50 → 放宽
+        if (perimeter < 50)   // ⭐ 原来50 → 放宽
             continue;
 
         // -----------------------------
