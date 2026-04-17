@@ -189,8 +189,21 @@ int Detector::init_yolov8_model(const char *model_path)
     printf("model input height=%d, width=%d, channel=%d\n",
            rknn_app_ctx_.model_height, rknn_app_ctx_.model_width, rknn_app_ctx_.model_channel);
 
-    return 0;
-}
+    // 提取模型名称（去掉路径）
+    const char *model_name = strrchr(model_path, '/');
+    if (model_name != NULL)
+    {
+        model_name++; // 跳过 '/'
+    }
+    else
+    {
+        model_name = model_path; // 没有路径，直接就是文件名
+    }
+
+    printf("load model success! \n model name: %s\n", model_name);
+
+        return 0;
+    }
 
 int Detector::release_yolov8_model()
 {
