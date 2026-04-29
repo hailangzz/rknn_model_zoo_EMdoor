@@ -1827,12 +1827,12 @@ bool isEdgePointValid(
 {
     const auto& pts = one.add_edge_point_single_pixel_camera_coordinates;
 
-    printf("into isEdgePointValid, edge point num = %zu\n", pts.size());
+    // printf("into isEdgePointValid, edge point num = %zu\n", pts.size());
 
     // 👉 1. 点数过滤
     if (pts.size() < min_points)
     {
-        printf("Invalid: too few edge points (%zu < %zu)\n", pts.size(), min_points);
+        // printf("Invalid: too few edge points (%zu < %zu)\n", pts.size(), min_points);
         return false;
     }
 
@@ -1841,7 +1841,7 @@ bool isEdgePointValid(
     {
         if (pt.Z > max_dist)
         {
-            printf("\nInvalid edge point found with Z = %f\n\n", pt.Z);
+            // printf("\nInvalid edge point found with Z = %f\n\n", pt.Z);
             return false;
         }
     }

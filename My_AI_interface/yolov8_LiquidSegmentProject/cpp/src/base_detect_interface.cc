@@ -106,7 +106,7 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         for (const auto& contour : contours_mark_point) {
             total_points += contour.size();
         }
-        printf("det[%d] filtered total points = %d\n", i, total_points);
+        // printf("det[%d] filtered total points = %d\n", i, total_points);
 
         filter_mask_contours(contours_mark_point, contours_mark_point_filtered); // 过滤轮廓点集（去除小面积、长宽比异常的轮廓）
         // one.object_contours_mark_point = contours_mark_point;     // 边界点数组赋值

@@ -124,8 +124,6 @@ void BaseDetectNode::inferenceLoop()
         }
 
         /* ---------- 推理 ---------- */
-        // ROS_DEBUG("base_detect_infer begin");
-        // base_detect_infer(img, camera_coordinates_results_);
         if (!base_detect_infer(img, camera_coordinates_results_))
             {
                 ROS_DEBUG("No valid object detected, skip publish");
@@ -142,63 +140,30 @@ void BaseDetectNode::inferenceLoop()
 
         for (const auto& r : camera_coordinates_results_)
             {
-                // ROS_INFO(
-                //     "Detect object: cls_id=%d, prop=%.3f, "
-                //     "LT(%.2f, %.2f, %.2f), RT(%.2f, %.2f, %.2f), "
-                //     "RB(%.2f, %.2f, %.2f), LB(%.2f, %.2f, %.2f)",
-                //     r.cls_id, r.prop,
-                //     r.coords[0].X, r.coords[0].Y, r.coords[0].Z,
-                //     r.coords[1].X, r.coords[1].Y, r.coords[1].Z,
-                //     r.coords[2].X, r.coords[2].Y, r.coords[2].Z,
-                //     r.coords[3].X, r.coords[3].Y, r.coords[3].Z
-                // );
-
-
-                // for (int i = 0; i < 20; ++i) {
-                //     auto& p = r.add_edge_point_single_pixel_camera_coordinates[i];
-                //     ROS_INFO(" dst : [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
-                // }
 
                 base_detect_msgs::ObjectCameraDetectResult one;
                 convertToMsg(r, one);
-
-                if(one.coords.size() < 11){
-                    for(int i=0;i<one.coords.size();i++){
-                        ROS_INFO("First contour point: x=%.3f, y=%.3f, z=%.3f", one.coords[i].x, one.coords[i].y, one.coords[i].z);
-                    }
-                continue;
+                if(one.coords.size() < 11)  // 过滤边缘点过少的目标（根据经验，边缘点过少的目标，往往是误检或者异常值），如果一个目标的边缘点小于11个，则丢弃该目标。
+                {
+                    continue;
                 }
                 msg.results.push_back(one);
-
-
-
             }
 
         /* ---------- 发布 ---------- */
-        // if(msg.coords.size() < 11)
-        //     for(int i=0;i<one.coords.size();i++){
-        //         ROS_INFO("First contour point: x=%.3f, y=%.3f, z=%.3f", one.coords[i].x, one.coords[i].y, one.coords[i].z);
-        //     }
-        //     continue;
-        // }
 
-        if (msg.results.empty())
+        if (msg.results.empty())  // 过滤掉没有有效检测结果的消息，避免发布空消息（根据经验，没有检测结果时，往往是误检或者异常值），如果本次推理没有任何有效目标，则不发布消息。
         {
-            // ROS_DEBUG("No valid detection results to publish");
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
         detect_result_pub_.publish(msg);
-        // ROS_INFO("contour point num: %zu", one.coords.size());
 
-        
         ROS_DEBUG("detect_result_pub_ published, size=%zu", msg.results.size());
 
         // 发布绘图结果
         publishDebugImage(img, camera_coordinates_results_, msg.header);
     }
 
-    // ROS_INFO("YOLOv8 inference thread exited");
 }
 
     /* ============ 资源释放 ============ */
