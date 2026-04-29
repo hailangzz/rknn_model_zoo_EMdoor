@@ -2,13 +2,18 @@
 
 #include <fstream>
 #include <iomanip>
+#include <atomic>
+#include <mutex>
 
 // 将xyz数据点，写入到本地文件中
 void appendCoordsToFile(
     base_detect_msgs::ObjectCameraDetectResult& dst,
     const std::string& file_path)
 {
-    std::ofstream ofs(file_path, std::ios::out | std::ios::app);
+    static std::mutex file_mutex;
+    std::lock_guard<std::mutex> lock(file_mutex);
+
+    static std::ofstream ofs(file_path, std::ios::out | std::ios::app);
     if (!ofs.is_open()) {
         ROS_ERROR("Failed to open file: %s", file_path.c_str());
         return;
@@ -26,10 +31,8 @@ void appendCoordsToFile(
         }
     }
 
-    ofs << "\n";  // 写完一次换一行
-    ofs.close();
+    ofs << "\n";
 }
-
 
 
 BaseDetectNode::BaseDetectNode(ros::NodeHandle& nh)        
@@ -67,14 +70,16 @@ BaseDetectNode::~BaseDetectNode()
     }
 
 void BaseDetectNode::create_infer_thread(){
-  try
-      {
-    /* 启动推理线程 */
-      infer_thread_ = std::thread(&BaseDetectNode::inferenceLoop, this);
-      }
-  catch (const cv_bridge::Exception& e)
+    try
     {
-      ROS_ERROR("infer_thread_ exception: %s", e.what());
+        if (!infer_thread_.joinable())   // ⭐ 防重复
+        {
+            infer_thread_ = std::thread(&BaseDetectNode::inferenceLoop, this);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        ROS_ERROR("infer_thread_ exception: %s", e.what());
     }
 }
 
@@ -126,8 +131,7 @@ void BaseDetectNode::inferenceLoop()
         /* ---------- 推理 ---------- */
         if (!base_detect_infer(img, camera_coordinates_results_))
             {
-                ROS_DEBUG("No valid object detected, skip publish");
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                ROS_DEBUG("No valid object detected, skip publish");                
                 continue;
             }
 
@@ -299,14 +303,17 @@ void BaseDetectNode::convertToMsg(
 /* ============ ROS 参数监控线程 ============ */
 void BaseDetectNode::rosparamMonitorLoop()
 {
-    ros::Rate rate(1.0);  // 每秒读取一次
+    ros::Rate rate(1.0);
     while (ros::ok() && running_)
     {
         bool param_val = false;
         if (nh_.getParam(infer_enable_param_, param_val))
         {
             infer_enable_ = param_val;
-            ROS_DEBUG("base_detect_enable = %d", infer_enable_);
+
+            frame_cv_.notify_all();   // ⭐ 关键修复（防卡死）
+
+            ROS_DEBUG("base_detect_enable = %d", (bool)infer_enable_);
         }
         rate.sleep();
     }

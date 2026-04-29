@@ -1,20 +1,20 @@
 
 # 编译指令：
-  #编译x86项目
-  catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=./aarch64-toolchain.cmake
+#编译x86项目
+catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=./aarch64-toolchain.cmake
 
-  #编译aarch64项目
-  catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/aarch64-toolchain.cmake
+#编译aarch64项目
+catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 -DCMAKE_TOOLCHAIN_FILE=/home/chenkejing/RKNNProjects/rknn_model_zoo/catkin_ws/aarch64-toolchain.cmake
 
 
 激活编译好的程序环境
 
-  source devel/setup.bash
+source devel/setup.bash
 
 执行指令
-  #rosrun my_image_pkg image_subscriber_node
+#rosrun my_image_pkg image_subscriber_node
 
-  rosrun my_image_pkg image_listener  
+rosrun my_image_pkg image_listener  
 
 
 
@@ -24,10 +24,10 @@
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  source /opt/ros/noetic/setup.bash
-  rosparam get /task_manager/wire_inspection_enable
-  rosparam set /task_manager/wire_inspection_enable true
-  --------------------------------------------------------------------------------------------------------
+source /opt/ros/noetic/setup.bash
+rosparam get /task_manager/wire_inspection_enable
+rosparam set /task_manager/wire_inspection_enable true
+--------------------------------------------------------------------------------------------------------
 
 shell命令行：
 

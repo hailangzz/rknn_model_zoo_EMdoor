@@ -46,7 +46,7 @@ private:
     bool running_;
 
     /* ============ 检测功能开关 ============ */
-    bool infer_enable_;                     // 私有推理开关
+    std::atomic<bool> infer_enable_{false};   // ⭐ 改为原子变量                     // 私有推理开关
     const std::string infer_enable_param_ = "/task_manager/base_inspection_enable";  // ROS param 名
     std::thread rosparam_monitor_thread_;  // 新增：监控开关参数线程
 
