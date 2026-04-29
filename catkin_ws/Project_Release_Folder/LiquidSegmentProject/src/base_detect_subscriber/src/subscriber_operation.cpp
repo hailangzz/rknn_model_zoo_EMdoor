@@ -161,11 +161,37 @@ void BaseDetectNode::inferenceLoop()
 
                 base_detect_msgs::ObjectCameraDetectResult one;
                 convertToMsg(r, one);
+
+                if(one.coords.size() < 11){
+                    for(int i=0;i<one.coords.size();i++){
+                        ROS_INFO("First contour point: x=%.3f, y=%.3f, z=%.3f", one.coords[i].x, one.coords[i].y, one.coords[i].z);
+                    }
+                continue;
+                }
                 msg.results.push_back(one);
+
+
+
             }
 
         /* ---------- 发布 ---------- */
+        // if(msg.coords.size() < 11)
+        //     for(int i=0;i<one.coords.size();i++){
+        //         ROS_INFO("First contour point: x=%.3f, y=%.3f, z=%.3f", one.coords[i].x, one.coords[i].y, one.coords[i].z);
+        //     }
+        //     continue;
+        // }
+
+        if (msg.results.empty())
+        {
+            // ROS_DEBUG("No valid detection results to publish");
+            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
         detect_result_pub_.publish(msg);
+        // ROS_INFO("contour point num: %zu", one.coords.size());
+
+        
         ROS_DEBUG("detect_result_pub_ published, size=%zu", msg.results.size());
 
         // 发布绘图结果

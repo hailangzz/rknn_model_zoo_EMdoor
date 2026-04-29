@@ -16,7 +16,7 @@
 #define OBJ_NUMB_MAX_SIZE 128
 #define OBJ_CLASS_NUM 1
 #define NMS_THRESH 0.45
-#define BOX_THRESH 0.35
+#define BOX_THRESH 0.7
 #define PROP_BOX_SIZE (5 + OBJ_CLASS_NUM)
 
 #define PROTO_CHANNEL 32
@@ -79,5 +79,7 @@ void smoothContour(
 void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
 
 void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours,std::vector<std::vector<cv::Point>> &output_contours);
+// bool isEdgePointValid(const ObjectCameraDetectResult& one, float max_dist); 
+bool isEdgePointValid(const ObjectCameraDetectResult& one, float max_dist, size_t min_points);  
 
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_

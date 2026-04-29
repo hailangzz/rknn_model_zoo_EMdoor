@@ -145,6 +145,14 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         // printf("%d\n", det->box.right);
         // printf("%d\n", det->box.bottom);
 
+        // if (!isEdgePointValid(one, 1.5f))     // 过滤表远点中，超过1.5米的边缘点（根据经验，液体表面边缘点过远，往往是错误的），如果一个目标的所有边缘点都无效，则丢弃整个目标。
+        // {
+        //     continue;
+        // }
+        if (!isEdgePointValid(one, 1.5f, 10))
+        {
+            continue;
+        }
         results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
         
         // 边框合法性校验：
@@ -177,6 +185,8 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
     free(src_image.virt_addr);
     return !results.empty();
 }
+
+
 
 void base_model_release()
 {
