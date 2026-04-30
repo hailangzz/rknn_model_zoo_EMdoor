@@ -8,6 +8,7 @@
 #*.npy
 *.pkl
 *.pb
+*.tar
 
 check*.onnx
 
