@@ -64,5 +64,6 @@ datasets/
 # 忽略手势识别项目不必要文件
 My_AI_interface/yolov8_HandDetectProject/database_test/
 
+*.tar
 
 
