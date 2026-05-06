@@ -30,9 +30,7 @@ CpuStat read_cpu()
 double calc_cpu(const CpuStat &a, const CpuStat &b)
 {
   long long idle = b.idle - a.idle;
-  long long total = (b.user - a.user) + (b.nice - a.nice) +
-                    (b.system - a.system) + (b.idle - a.idle);
-
+  long long total = (b.user - a.user) + (b.nice - a.nice) + (b.system - a.system) + (b.idle - a.idle);
   return total == 0 ? 0 : (1.0 - (double)idle / total) * 100;
 }
 
@@ -62,27 +60,22 @@ double get_mem_usage()
 // ================= NPU =================
 struct NpuLoad
 {
-  int core0 = 0;
-  int core1 = 0;
-  int core2 = 0;
+  int core0 = 0, core1 = 0, core2 = 0;
   double avg = 0;
   double max = 0;
 };
 
-NpuLoad parse_npu_line(const std::string &line)
+// 解析 RK3588 debugfs
+NpuLoad parse_npu(const std::string &line)
 {
-  NpuLoad npu;
-
+  NpuLoad n;
   sscanf(line.c_str(),
          "NPU load: Core0: %d%%, Core1: %d%%, Core2: %d%%",
-         &npu.core0,
-         &npu.core1,
-         &npu.core2);
+         &n.core0, &n.core1, &n.core2);
 
-  npu.avg = (npu.core0 + npu.core1 + npu.core2) / 3.0;
-  npu.max = std::max({npu.core0, npu.core1, npu.core2});
-
-  return npu;
+  n.avg = (n.core0 + n.core1 + n.core2) / 3.0;
+  n.max = std::max({n.core0, n.core1, n.core2});
+  return n;
 }
 
 NpuLoad get_npu_usage()
@@ -93,76 +86,62 @@ NpuLoad get_npu_usage()
 
   std::string line;
   std::getline(f, line);
-
-  return parse_npu_line(line);
+  return parse_npu(line);
 }
 
-// ================= Args（升级版）=================
+// ================= Args =================
 struct Args
 {
   std::vector<std::string> models;
   std::vector<int> threads;
-  int run_time = 30;
+  int run_time = 20;
   int warmup = 3;
   std::string output = "report.csv";
 };
 
-// ================= 参数解析 =================
+// ================= parse =================
 Args parse_args(int argc, char **argv)
 {
-  Args args;
+  Args a;
 
   for (int i = 1; i < argc; i++)
   {
-    std::string key = argv[i];
+    std::string k = argv[i];
 
-    // -------- models --------
-    if (key == "--models")
+    if (k == "--models")
     {
       while (i + 1 < argc && argv[i + 1][0] != '-')
-      {
-        args.models.push_back(argv[++i]);
-      }
+        a.models.push_back(argv[++i]);
     }
-
-    // -------- threads --------
-    else if (key == "--threads")
+    else if (k == "--threads")
     {
       while (i + 1 < argc && argv[i + 1][0] != '-')
-      {
-        args.threads.push_back(std::atoi(argv[++i]));
-      }
+        a.threads.push_back(std::atoi(argv[++i]));
     }
-
-    // -------- time --------
-    else if (key == "--time")
+    else if (k == "--time")
     {
-      args.run_time = std::atoi(argv[++i]);
+      a.run_time = atoi(argv[++i]);
     }
-
-    // -------- output --------
-    else if (key == "--output")
+    else if (k == "--output")
     {
-      args.output = argv[++i];
+      a.output = argv[++i];
     }
   }
 
-  // 默认值保护
-  if (args.models.empty())
-    args.models.push_back("model/liquid_960p.rknn");
+  if (a.models.empty())
+    a.models = {"model/liquid_960p.rknn"};
 
-  if (args.threads.empty())
-    args.threads = {1, 2, 3, 4};
+  if (a.threads.empty())
+    a.threads = {1, 2, 3, 4, 5, 6, 7, 8};
 
-  return args;
+  return a;
 }
 
 // ================= Stats =================
 struct Stats
 {
   std::atomic<int> count{0};
-  std::atomic<long long> latency_sum{0};
-  std::vector<long long> lat_vec;
+  std::atomic<long long> lat_sum{0};
 };
 
 // ================= Worker =================
@@ -171,19 +150,12 @@ struct Worker
   rknn_context ctx;
   int input_size;
   rknn_tensor_format fmt;
-  int id;
   bool running = true;
   Stats stats;
 
-  Worker(std::string path, int tid) : id(tid)
+  Worker(const std::string &path)
   {
     FILE *fp = fopen(path.c_str(), "rb");
-    if (!fp)
-    {
-      std::cerr << "open model failed: " << path << "\n";
-      exit(-1);
-    }
-
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
     rewind(fp);
@@ -192,39 +164,35 @@ struct Worker
     fread(model.data(), 1, size, fp);
     fclose(fp);
 
-    rknn_init(&ctx, model.data(), size, 0, NULL);
+    rknn_init(&ctx, model.data(), size, 0, nullptr);
 
-    rknn_tensor_attr attr;
-    memset(&attr, 0, sizeof(attr));
+    rknn_tensor_attr attr{};
     attr.index = 0;
     rknn_query(ctx, RKNN_QUERY_INPUT_ATTR, &attr, sizeof(attr));
 
     fmt = attr.fmt;
-
     input_size = 1;
     for (int i = 0; i < attr.n_dims; i++)
       input_size *= attr.dims[i];
-
-    std::cout << "Thread " << id << " input=" << input_size << "\n";
   }
 
   void run()
   {
     std::vector<uint8_t> input(input_size, 0);
 
-    rknn_input in[1] = {0};
-    in[0].index = 0;
-    in[0].buf = input.data();
-    in[0].size = input_size;
-    in[0].type = RKNN_TENSOR_UINT8;
-    in[0].fmt = fmt;
+    rknn_input in{};
+    in.index = 0;
+    in.buf = input.data();
+    in.size = input_size;
+    in.type = RKNN_TENSOR_UINT8;
+    in.fmt = fmt;
 
     while (running)
     {
       auto t1 = std::chrono::high_resolution_clock::now();
 
-      rknn_inputs_set(ctx, 1, in);
-      rknn_run(ctx, NULL);
+      rknn_inputs_set(ctx, 1, &in);
+      rknn_run(ctx, nullptr);
 
       auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -232,10 +200,7 @@ struct Worker
           std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
       stats.count++;
-      stats.latency_sum += lat;
-
-      if (stats.lat_vec.size() < 10000)
-        stats.lat_vec.push_back(lat);
+      stats.lat_sum += lat;
     }
   }
 
@@ -243,25 +208,15 @@ struct Worker
   void release() { rknn_destroy(ctx); }
 };
 
-// ================= percentile =================
-double percentile(std::vector<long long> &v, double p)
-{
-  if (v.empty())
-    return 0;
-  std::sort(v.begin(), v.end());
-  int idx = std::min((int)(p * v.size()), (int)v.size() - 1);
-  return v[idx] / 1000.0;
-}
-
-// ================= test =================
+// ================= TEST =================
 void run_test(int th, const Args &args, std::ofstream &csv)
 {
+
+  std::string model = args.models[0];
+
   std::vector<std::shared_ptr<Worker>> ws;
-
-  std::string model = args.models[th % args.models.size()];
-
   for (int i = 0; i < th; i++)
-    ws.push_back(std::make_shared<Worker>(model, i));
+    ws.push_back(std::make_shared<Worker>(model));
 
   std::vector<std::thread> ts;
   for (auto &w : ws)
@@ -271,14 +226,13 @@ void run_test(int th, const Args &args, std::ofstream &csv)
 
   CpuStat prev = read_cpu();
 
-  double cpu_sum = 0, mem_sum = 0;
-  double npu_sum = 0;
+  long long total_fps = 0;
+  double cpu_sum = 0, mem_sum = 0, npu_sum = 0;
   double npu_peak = 0;
   int npu_cnt = 0;
+  int last = 0;
 
-  int last_total = 0;
-
-  for (int t = 0; t < args.run_time; t++)
+  for (int i = 0; i < args.run_time; i++)
   {
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -303,14 +257,15 @@ void run_test(int th, const Args &args, std::ofstream &csv)
     for (auto &w : ws)
       total += w->stats.count;
 
-    int fps = total - last_total;
-    last_total = total;
+    int fps = total - last;
+    last = total;
+
+    total_fps += fps;
 
     std::cout << "[T" << th << "] FPS=" << fps
               << " CPU=" << cpu
               << " MEM=" << mem
-              << " NPU(avg)=" << npu.avg
-              << " max=" << npu.max << "\n";
+              << " NPU=" << npu.avg << "%" << "\n";
   }
 
   for (auto &w : ws)
@@ -318,25 +273,42 @@ void run_test(int th, const Args &args, std::ofstream &csv)
   for (auto &t : ts)
     t.join();
 
-  std::cout << "\n==== RESULT " << th << " DONE ====\n";
+  double avg_fps = total_fps / (double)args.run_time;
+  double cpu_avg = cpu_sum / args.run_time;
+  double mem_avg = mem_sum / args.run_time;
+  double npu_avg = (npu_cnt ? npu_sum / npu_cnt : -1);
+
+  // ================= ⭐ 关键修复：写CSV =================
+  csv << th << ","
+      << avg_fps << ","
+      << cpu_avg << ","
+      << mem_avg << ","
+      << npu_avg << ","
+      << npu_peak << "\n";
+
+  std::cout << "\n==== RESULT " << th << " ====\n";
+  std::cout << "FPS=" << avg_fps << "\n";
+  std::cout << "CPU=" << cpu_avg << "%\n";
+  std::cout << "MEM=" << mem_avg << "%\n";
+  std::cout << "NPU(avg)=" << npu_avg << "%\n";
 }
 
-// ================= main =================
+// ================= MAIN =================
 int main(int argc, char **argv)
 {
+
   Args args = parse_args(argc, argv);
 
-  std::cout << "==== RKNN Benchmark (CLI UPGRADED) ====\n";
-
   std::ofstream csv(args.output);
-  csv << "threads,fps,avg_ms,p50,p90,p99,cpu,mem,npu_avg,npu_peak\n";
+  csv << "threads,fps,cpu,mem,npu_avg,npu_peak\n";
+
+  std::cout << "==== RKNN Benchmark ====\n";
 
   for (auto t : args.threads)
     run_test(t, args, csv);
 
   csv.close();
 
-  std::cout << "Report saved: " << args.output << std::endl;
-
+  std::cout << "Saved: " << args.output << std::endl;
   return 0;
 }
