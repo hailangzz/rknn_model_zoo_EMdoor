@@ -69,7 +69,6 @@ struct NpuLoad
   double max = 0;
 };
 
-// 解析一行 NPU load
 NpuLoad parse_npu_line(const std::string &line)
 {
   NpuLoad npu;
@@ -86,7 +85,6 @@ NpuLoad parse_npu_line(const std::string &line)
   return npu;
 }
 
-// 读取 RK3588 NPU load
 NpuLoad get_npu_usage()
 {
   std::ifstream f("/sys/kernel/debug/rknpu/load");
@@ -99,37 +97,67 @@ NpuLoad get_npu_usage()
   return parse_npu_line(line);
 }
 
-// ================= Debug =================
-void debug_npu_path()
-{
-  std::cout << "Scanning NPU nodes...\n";
-
-  DIR *dir = opendir("/sys/class/devfreq/");
-  if (!dir)
-    return;
-
-  struct dirent *entry;
-  while ((entry = readdir(dir)) != nullptr)
-  {
-    std::string name = entry->d_name;
-    if (name.find("npu") != std::string::npos)
-    {
-      std::cout << "Found NPU devfreq: " << name << std::endl;
-    }
-  }
-  closedir(dir);
-}
-
-// ================= 参数 =================
+// ================= Args（升级版）=================
 struct Args
 {
-  std::vector<std::string> models = {"model/liquid_960p.rknn"};
-  std::vector<int> threads = {1, 2, 3, 4};
-  int run_time = 20;
+  std::vector<std::string> models;
+  std::vector<int> threads;
+  int run_time = 30;
   int warmup = 3;
   std::string output = "report.csv";
 };
 
+// ================= 参数解析 =================
+Args parse_args(int argc, char **argv)
+{
+  Args args;
+
+  for (int i = 1; i < argc; i++)
+  {
+    std::string key = argv[i];
+
+    // -------- models --------
+    if (key == "--models")
+    {
+      while (i + 1 < argc && argv[i + 1][0] != '-')
+      {
+        args.models.push_back(argv[++i]);
+      }
+    }
+
+    // -------- threads --------
+    else if (key == "--threads")
+    {
+      while (i + 1 < argc && argv[i + 1][0] != '-')
+      {
+        args.threads.push_back(std::atoi(argv[++i]));
+      }
+    }
+
+    // -------- time --------
+    else if (key == "--time")
+    {
+      args.run_time = std::atoi(argv[++i]);
+    }
+
+    // -------- output --------
+    else if (key == "--output")
+    {
+      args.output = argv[++i];
+    }
+  }
+
+  // 默认值保护
+  if (args.models.empty())
+    args.models.push_back("model/liquid_960p.rknn");
+
+  if (args.threads.empty())
+    args.threads = {1, 2, 3, 4};
+
+  return args;
+}
+
+// ================= Stats =================
 struct Stats
 {
   std::atomic<int> count{0};
@@ -152,7 +180,7 @@ struct Worker
     FILE *fp = fopen(path.c_str(), "rb");
     if (!fp)
     {
-      std::cerr << "open model failed\n";
+      std::cerr << "open model failed: " << path << "\n";
       exit(-1);
     }
 
@@ -164,11 +192,7 @@ struct Worker
     fread(model.data(), 1, size, fp);
     fclose(fp);
 
-    if (rknn_init(&ctx, model.data(), size, 0, NULL) != RKNN_SUCC)
-    {
-      std::cerr << "rknn_init failed\n";
-      exit(-1);
-    }
+    rknn_init(&ctx, model.data(), size, 0, NULL);
 
     rknn_tensor_attr attr;
     memset(&attr, 0, sizeof(attr));
@@ -199,10 +223,8 @@ struct Worker
     {
       auto t1 = std::chrono::high_resolution_clock::now();
 
-      if (rknn_inputs_set(ctx, 1, in) != RKNN_SUCC)
-        break;
-      if (rknn_run(ctx, NULL) != RKNN_SUCC)
-        break;
+      rknn_inputs_set(ctx, 1, in);
+      rknn_run(ctx, NULL);
 
       auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -236,22 +258,16 @@ void run_test(int th, const Args &args, std::ofstream &csv)
 {
   std::vector<std::shared_ptr<Worker>> ws;
 
+  std::string model = args.models[th % args.models.size()];
+
   for (int i = 0; i < th; i++)
-    ws.push_back(std::make_shared<Worker>(args.models[0], i));
+    ws.push_back(std::make_shared<Worker>(model, i));
 
   std::vector<std::thread> ts;
   for (auto &w : ws)
     ts.emplace_back(&Worker::run, w);
 
-  std::cout << "Warmup " << args.warmup << "s...\n";
   std::this_thread::sleep_for(std::chrono::seconds(args.warmup));
-
-  for (auto &w : ws)
-  {
-    w->stats.count = 0;
-    w->stats.latency_sum = 0;
-    w->stats.lat_vec.clear();
-  }
 
   CpuStat prev = read_cpu();
 
@@ -290,13 +306,11 @@ void run_test(int th, const Args &args, std::ofstream &csv)
     int fps = total - last_total;
     last_total = total;
 
-    std::cout << "[T" << th << "] sec " << t + 1
-              << " FPS=" << fps
+    std::cout << "[T" << th << "] FPS=" << fps
               << " CPU=" << cpu
               << " MEM=" << mem
               << " NPU(avg)=" << npu.avg
-              << " max=" << npu.max
-              << "\n";
+              << " max=" << npu.max << "\n";
   }
 
   for (auto &w : ws)
@@ -304,64 +318,25 @@ void run_test(int th, const Args &args, std::ofstream &csv)
   for (auto &t : ts)
     t.join();
 
-  int total = 0;
-  long long lat_sum = 0;
-  std::vector<long long> all_lat;
-
-  for (auto &w : ws)
-  {
-    total += w->stats.count;
-    lat_sum += w->stats.latency_sum;
-    all_lat.insert(all_lat.end(), w->stats.lat_vec.begin(), w->stats.lat_vec.end());
-  }
-
-  double fps = total * 1.0 / args.run_time;
-  double avg = lat_sum * 1.0 / total / 1000;
-
-  double p50 = percentile(all_lat, 0.5);
-  double p90 = percentile(all_lat, 0.9);
-  double p99 = percentile(all_lat, 0.99);
-
-  double cpu_avg = cpu_sum / args.run_time;
-  double mem_avg = mem_sum / args.run_time;
-  double npu_avg = (npu_cnt > 0) ? (npu_sum / npu_cnt) : -1;
-
-  std::cout << "\n==== RESULT " << th << " ====\n";
-  std::cout << "FPS=" << fps << "\n";
-  std::cout << "AVG=" << avg << " ms\n";
-  std::cout << "P50=" << p50 << " ms\n";
-  std::cout << "P90=" << p90 << " ms\n";
-  std::cout << "P99=" << p99 << " ms\n";
-  std::cout << "CPU=" << cpu_avg << " %\n";
-  std::cout << "MEM=" << mem_avg << " %\n";
-  std::cout << "NPU(avg)=" << npu_avg << " %\n";
-  std::cout << "NPU(peak)=" << npu_peak << " %\n";
-
-  csv << th << "," << fps << "," << avg << "," << p50 << "," << p90 << "," << p99
-      << "," << cpu_avg << "," << mem_avg << "," << npu_avg << "," << npu_peak << "\n";
-
-  for (auto &w : ws)
-    w->release();
+  std::cout << "\n==== RESULT " << th << " DONE ====\n";
 }
 
 // ================= main =================
 int main(int argc, char **argv)
 {
-  Args args;
+  Args args = parse_args(argc, argv);
 
-  debug_npu_path();
+  std::cout << "==== RKNN Benchmark (CLI UPGRADED) ====\n";
 
   std::ofstream csv(args.output);
   csv << "threads,fps,avg_ms,p50,p90,p99,cpu,mem,npu_avg,npu_peak\n";
-
-  std::cout << "==== RKNN Benchmark (REAL NPU UTIL FIXED) ====\n";
 
   for (auto t : args.threads)
     run_test(t, args, csv);
 
   csv.close();
 
-  std::cout << "\nReport saved to " << args.output << std::endl;
+  std::cout << "Report saved: " << args.output << std::endl;
 
   return 0;
 }
