@@ -6,13 +6,40 @@
 #include <cstring>
 #include <memory>
 #include <fstream>
-#include <mutex>
 
 #include "rknn_api.h"
 
-#include <sstream>
+// ================= CPU监控 =================
+struct CpuStat
+{
+  long long user = 0, nice = 0, system = 0, idle = 0;
+};
 
-// ---------------- 参数解析 ----------------
+CpuStat read_cpu()
+{
+  std::ifstream file("/proc/stat");
+  std::string cpu;
+  CpuStat s;
+  file >> cpu >> s.user >> s.nice >> s.system >> s.idle;
+  return s;
+}
+
+double calc_cpu_usage(const CpuStat &a, const CpuStat &b)
+{
+  long long idle = b.idle - a.idle;
+  long long total =
+      (b.user - a.user) +
+      (b.nice - a.nice) +
+      (b.system - a.system) +
+      (b.idle - a.idle);
+
+  if (total == 0)
+    return 0;
+
+  return (1.0 - (double)idle / total) * 100.0;
+}
+
+// ================= 参数 =================
 struct Args
 {
   std::vector<std::string> models;
@@ -33,20 +60,14 @@ Args parse_args(int argc, char **argv)
     {
       i++;
       while (i < argc && argv[i][0] != '-')
-      {
-        args.models.push_back(argv[i]);
-        i++;
-      }
+        args.models.push_back(argv[i++]);
       i--;
     }
     else if (key == "--threads")
     {
       i++;
       while (i < argc && argv[i][0] != '-')
-      {
-        args.threads.push_back(std::stoi(argv[i]));
-        i++;
-      }
+        args.threads.push_back(std::stoi(argv[i++]));
       i--;
     }
     else if (key == "--time")
@@ -59,12 +80,9 @@ Args parse_args(int argc, char **argv)
     }
   }
 
-  // 默认值
   if (args.models.empty())
   {
-    args.models = {
-        "model/liquid_960p.rknn",
-        "model/wire_960p.rknn"};
+    args.models = {"model/liquid_960p.rknn", "model/wire_960p.rknn"};
   }
 
   if (args.threads.empty())
@@ -75,12 +93,14 @@ Args parse_args(int argc, char **argv)
   return args;
 }
 
+// ================= 统计 =================
 struct Stats
 {
   std::atomic<int> count{0};
   std::atomic<long long> total_latency{0};
 };
 
+// ================= Worker =================
 struct Worker
 {
   std::string model_path;
@@ -100,7 +120,10 @@ struct Worker
   {
     FILE *fp = fopen(model_path.c_str(), "rb");
     if (!fp)
+    {
+      std::cerr << "Open model failed\n";
       return false;
+    }
 
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
@@ -111,9 +134,12 @@ struct Worker
     fclose(fp);
 
     if (rknn_init(&ctx, model.data(), size, 0, NULL) != RKNN_SUCC)
+    {
+      std::cerr << "rknn_init failed\n";
       return false;
+    }
 
-    // 👉 自动分配NPU核
+    // 自动分配NPU核
     rknn_core_mask mask;
     if (thread_id % 3 == 0)
       mask = RKNN_NPU_CORE_0;
@@ -136,6 +162,8 @@ struct Worker
     for (int i = 0; i < attr.n_dims; i++)
       input_size *= attr.dims[i];
 
+    std::cout << "[Thread " << thread_id << "] Input size=" << input_size << std::endl;
+
     return true;
   }
 
@@ -157,6 +185,7 @@ struct Worker
 
       if (rknn_inputs_set(ctx, 1, inputs) != RKNN_SUCC)
         break;
+
       if (rknn_run(ctx, NULL) != RKNN_SUCC)
         break;
 
@@ -171,28 +200,22 @@ struct Worker
   }
 
   void stop() { running = false; }
-
   void release() { rknn_destroy(ctx); }
 };
 
+// ================= 测试 =================
 void run_test(int thread_num,
               const std::vector<std::string> &models,
               int run_time,
               std::ofstream &csv)
 {
-
   std::vector<std::shared_ptr<Worker>> workers;
 
   for (int i = 0; i < thread_num; i++)
   {
-    auto w = std::make_shared<Worker>(
-        models[i % models.size()], i);
-
+    auto w = std::make_shared<Worker>(models[i % models.size()], i);
     if (!w->init())
-    {
-      std::cerr << "Init failed\n";
       return;
-    }
     workers.push_back(w);
   }
 
@@ -200,17 +223,26 @@ void run_test(int thread_num,
   for (auto &w : workers)
     threads.emplace_back(&Worker::run, w);
 
-  // 👉 实时FPS打印
+  CpuStat prev = read_cpu();
+  double cpu_sum = 0;
+
   for (int i = 0; i < run_time; i++)
   {
     std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    CpuStat curr = read_cpu();
+    double cpu = calc_cpu_usage(prev, curr);
+    prev = curr;
+    cpu_sum += cpu;
 
     int total = 0;
     for (auto &w : workers)
       total += w->stats.count;
 
     std::cout << "[Threads " << thread_num << "] "
-              << "Time " << i + 1 << "s, FPS=" << total / (i + 1) << std::endl;
+              << "Time " << i + 1
+              << "s FPS=" << total / (i + 1)
+              << " CPU=" << cpu << "%\n";
   }
 
   for (auto &w : workers)
@@ -218,7 +250,6 @@ void run_test(int thread_num,
   for (auto &t : threads)
     t.join();
 
-  // 👉 汇总
   int total_count = 0;
   long long total_latency = 0;
 
@@ -230,39 +261,36 @@ void run_test(int thread_num,
 
   double fps = total_count * 1.0 / run_time;
   double avg_latency = total_latency * 1.0 / total_count / 1000.0;
+  double avg_cpu = cpu_sum / run_time;
 
-  std::cout << "\n==== RESULT (Threads=" << thread_num << ") ====\n";
-  std::cout << "Total FPS: " << fps << std::endl;
-  std::cout << "Avg Latency: " << avg_latency << " ms\n";
+  // 👉 NPU估算（简单模型）
+  double npu_util = std::min(100.0, fps / (thread_num * 40.0) * 100.0);
 
-  // 写CSV
-  csv << thread_num << "," << fps << "," << avg_latency << "\n";
+  std::cout << "\n==== RESULT (" << thread_num << " threads) ====\n";
+  std::cout << "FPS: " << fps << "\n";
+  std::cout << "Latency: " << avg_latency << " ms\n";
+  std::cout << "CPU: " << avg_cpu << " %\n";
+  std::cout << "NPU(est): " << npu_util << " %\n";
+
+  csv << thread_num << ","
+      << fps << ","
+      << avg_latency << ","
+      << avg_cpu << ","
+      << npu_util << "\n";
 
   for (auto &w : workers)
     w->release();
 }
 
+// ================= main =================
 int main(int argc, char **argv)
 {
   Args args = parse_args(argc, argv);
 
   std::ofstream csv(args.output);
-  csv << "threads,fps,avg_latency(ms)\n";
+  csv << "threads,fps,latency_ms,cpu,npu_est\n";
 
-  std::cout << "==== RKNN Auto Stress Test ====\n";
-
-  std::cout << "Models: ";
-  for (auto &m : args.models)
-    std::cout << m << " ";
-  std::cout << "\n";
-
-  std::cout << "Threads: ";
-  for (auto t : args.threads)
-    std::cout << t << " ";
-  std::cout << "\n";
-
-  std::cout << "Run Time: " << args.run_time << "s\n";
-  std::cout << "Output: " << args.output << "\n\n";
+  std::cout << "==== RKNN Stress Test ====\n";
 
   for (auto t : args.threads)
   {
@@ -271,7 +299,6 @@ int main(int argc, char **argv)
 
   csv.close();
 
-  std::cout << "\n📄 Report saved: " << args.output << "\n";
-
+  std::cout << "\nReport saved: " << args.output << std::endl;
   return 0;
 }
