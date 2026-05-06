@@ -20,8 +20,10 @@ onnx 模型转rknn:
 
   ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_liquid_detect
 
-
   ./build-linux-my-program.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
+
+  编译性能测试项目
+    ./build-linux-my-program.sh -t rk3588 -a aarch64 -d NPU_Stress_test
 
   编译yolov8_seg项目
     ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_seg_carpet
@@ -38,6 +40,8 @@ onnx 模型转rknn:
   
   ./build-android-my-interface.sh -t rk3588 -a arm64-v8a -d yolov8_CarpetDetectProject
   ./build-android-my-interface.sh -t rk3568 -a arm64-v8a -d yolov8_HandDetectProject
+
+  
 
 
 板端程序测试：

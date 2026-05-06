@@ -65,5 +65,8 @@ datasets/
 # 忽略手势识别项目不必要文件
 My_AI_interface/yolov8_HandDetectProject/database_test/
 
+# 忽略NPU性能测试，模型文件
+My_AI_process/NPU_Stress_test/test_models
+
 
 
