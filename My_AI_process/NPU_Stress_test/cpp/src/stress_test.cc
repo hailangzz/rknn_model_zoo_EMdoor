@@ -10,6 +10,71 @@
 
 #include "rknn_api.h"
 
+#include <sstream>
+
+// ---------------- 参数解析 ----------------
+struct Args
+{
+  std::vector<std::string> models;
+  std::vector<int> threads;
+  int run_time = 20;
+  std::string output = "rknn_report.csv";
+};
+
+Args parse_args(int argc, char **argv)
+{
+  Args args;
+
+  for (int i = 1; i < argc; i++)
+  {
+    std::string key = argv[i];
+
+    if (key == "--models")
+    {
+      i++;
+      while (i < argc && argv[i][0] != '-')
+      {
+        args.models.push_back(argv[i]);
+        i++;
+      }
+      i--;
+    }
+    else if (key == "--threads")
+    {
+      i++;
+      while (i < argc && argv[i][0] != '-')
+      {
+        args.threads.push_back(std::stoi(argv[i]));
+        i++;
+      }
+      i--;
+    }
+    else if (key == "--time")
+    {
+      args.run_time = std::stoi(argv[++i]);
+    }
+    else if (key == "--output")
+    {
+      args.output = argv[++i];
+    }
+  }
+
+  // 默认值
+  if (args.models.empty())
+  {
+    args.models = {
+        "model/liquid_960p.rknn",
+        "model/wire_960p.rknn"};
+  }
+
+  if (args.threads.empty())
+  {
+    args.threads = {1, 2, 3, 4};
+  }
+
+  return args;
+}
+
 struct Stats
 {
   std::atomic<int> count{0};
@@ -177,28 +242,36 @@ void run_test(int thread_num,
     w->release();
 }
 
-int main()
+int main(int argc, char **argv)
 {
-  std::vector<std::string> models = {
-      "model/liquid_960p.rknn",
-      "model/wire_960p.rknn"};
+  Args args = parse_args(argc, argv);
 
-  int run_time = 20;
-
-  std::ofstream csv("rknn_report.csv");
+  std::ofstream csv(args.output);
   csv << "threads,fps,avg_latency(ms)\n";
 
   std::cout << "==== RKNN Auto Stress Test ====\n";
 
-  // 👉 自动跑1~4线程
-  for (int t = 1; t <= 4; t++)
+  std::cout << "Models: ";
+  for (auto &m : args.models)
+    std::cout << m << " ";
+  std::cout << "\n";
+
+  std::cout << "Threads: ";
+  for (auto t : args.threads)
+    std::cout << t << " ";
+  std::cout << "\n";
+
+  std::cout << "Run Time: " << args.run_time << "s\n";
+  std::cout << "Output: " << args.output << "\n\n";
+
+  for (auto t : args.threads)
   {
-    run_test(t, models, run_time, csv);
+    run_test(t, args.models, args.run_time, csv);
   }
 
   csv.close();
 
-  std::cout << "\n📄 Report saved: rknn_report.csv\n";
+  std::cout << "\n📄 Report saved: " << args.output << "\n";
 
   return 0;
 }

@@ -59,5 +59,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../Readme DESTINATION .)
 file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
 install(FILES ${RKNN_FILES} DESTINATION model)
