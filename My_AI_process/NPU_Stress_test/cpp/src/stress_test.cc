@@ -5,35 +5,37 @@
 #include <chrono>
 #include <cstring>
 #include <memory>
+#include <fstream>
+#include <mutex>
 
 #include "rknn_api.h"
+
+struct Stats
+{
+  std::atomic<int> count{0};
+  std::atomic<long long> total_latency{0};
+};
 
 struct Worker
 {
   std::string model_path;
-  int core_mask;
   int thread_id;
-  std::atomic<int> count;
-  bool running;
 
   rknn_context ctx;
-
-  // 自动获取的输入信息
   int input_size;
   rknn_tensor_format input_fmt;
 
-  Worker(const std::string &path, int core, int id)
-      : model_path(path), core_mask(core), thread_id(id),
-        count(0), running(true), input_size(0) {}
+  Stats stats;
+  bool running;
+
+  Worker(const std::string &path, int id)
+      : model_path(path), thread_id(id), running(true) {}
 
   bool init()
   {
     FILE *fp = fopen(model_path.c_str(), "rb");
     if (!fp)
-    {
-      std::cerr << "Failed to open model: " << model_path << std::endl;
       return false;
-    }
 
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
@@ -44,55 +46,30 @@ struct Worker
     fclose(fp);
 
     if (rknn_init(&ctx, model.data(), size, 0, NULL) != RKNN_SUCC)
-    {
-      std::cerr << "rknn_init failed\n";
       return false;
-    }
 
-    // 👉 设置单核（先保证稳定）
-    rknn_core_mask mask = RKNN_NPU_CORE_0;
-    if (rknn_set_core_mask(ctx, mask) != RKNN_SUCC)
-    {
-      std::cerr << "set core mask failed\n";
-    }
+    // 👉 自动分配NPU核
+    rknn_core_mask mask;
+    if (thread_id % 3 == 0)
+      mask = RKNN_NPU_CORE_0;
+    else if (thread_id % 3 == 1)
+      mask = RKNN_NPU_CORE_1;
+    else
+      mask = RKNN_NPU_CORE_2;
 
-    // 👉 查询输入信息（关键！）
-    rknn_input_output_num io_num;
-    if (rknn_query(ctx, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num)) != RKNN_SUCC)
-    {
-      std::cerr << "query io num failed\n";
-      return false;
-    }
+    rknn_set_core_mask(ctx, mask);
 
-    rknn_tensor_attr input_attr;
-    memset(&input_attr, 0, sizeof(input_attr));
-    input_attr.index = 0;
+    // 查询输入
+    rknn_tensor_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.index = 0;
+    rknn_query(ctx, RKNN_QUERY_INPUT_ATTR, &attr, sizeof(attr));
 
-    if (rknn_query(ctx, RKNN_QUERY_INPUT_ATTR, &input_attr, sizeof(input_attr)) != RKNN_SUCC)
-    {
-      std::cerr << "query input attr failed\n";
-      return false;
-    }
+    input_fmt = attr.fmt;
 
-    std::cout << "[Thread " << thread_id << "] Input dims: ";
-    for (int i = 0; i < input_attr.n_dims; i++)
-    {
-      std::cout << input_attr.dims[i] << " ";
-    }
-    std::cout << std::endl;
-
-    input_fmt = input_attr.fmt;
-
-    // 👉 自动计算 size
     input_size = 1;
-    for (int i = 0; i < input_attr.n_dims; i++)
-    {
-      input_size *= input_attr.dims[i];
-    }
-
-    std::cout << "[Thread " << thread_id << "] Input size: " << input_size << std::endl;
-    std::cout << "[Thread " << thread_id << "] Format: "
-              << (input_fmt == RKNN_TENSOR_NCHW ? "NCHW" : "NHWC") << std::endl;
+    for (int i = 0; i < attr.n_dims; i++)
+      input_size *= attr.dims[i];
 
     return true;
   }
@@ -111,32 +88,94 @@ struct Worker
 
     while (running)
     {
+      auto t1 = std::chrono::high_resolution_clock::now();
+
       if (rknn_inputs_set(ctx, 1, inputs) != RKNN_SUCC)
-      {
-        std::cerr << "[Thread " << thread_id << "] inputs_set failed\n";
         break;
-      }
-
       if (rknn_run(ctx, NULL) != RKNN_SUCC)
-      {
-        std::cerr << "[Thread " << thread_id << "] rknn_run failed\n";
         break;
-      }
 
-      count++;
+      auto t2 = std::chrono::high_resolution_clock::now();
+
+      long long latency =
+          std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+
+      stats.count++;
+      stats.total_latency += latency;
     }
   }
 
-  void stop()
+  void stop() { running = false; }
+
+  void release() { rknn_destroy(ctx); }
+};
+
+void run_test(int thread_num,
+              const std::vector<std::string> &models,
+              int run_time,
+              std::ofstream &csv)
+{
+
+  std::vector<std::shared_ptr<Worker>> workers;
+
+  for (int i = 0; i < thread_num; i++)
   {
-    running = false;
+    auto w = std::make_shared<Worker>(
+        models[i % models.size()], i);
+
+    if (!w->init())
+    {
+      std::cerr << "Init failed\n";
+      return;
+    }
+    workers.push_back(w);
   }
 
-  void release()
+  std::vector<std::thread> threads;
+  for (auto &w : workers)
+    threads.emplace_back(&Worker::run, w);
+
+  // 👉 实时FPS打印
+  for (int i = 0; i < run_time; i++)
   {
-    rknn_destroy(ctx);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    int total = 0;
+    for (auto &w : workers)
+      total += w->stats.count;
+
+    std::cout << "[Threads " << thread_num << "] "
+              << "Time " << i + 1 << "s, FPS=" << total / (i + 1) << std::endl;
   }
-};
+
+  for (auto &w : workers)
+    w->stop();
+  for (auto &t : threads)
+    t.join();
+
+  // 👉 汇总
+  int total_count = 0;
+  long long total_latency = 0;
+
+  for (auto &w : workers)
+  {
+    total_count += w->stats.count;
+    total_latency += w->stats.total_latency;
+  }
+
+  double fps = total_count * 1.0 / run_time;
+  double avg_latency = total_latency * 1.0 / total_count / 1000.0;
+
+  std::cout << "\n==== RESULT (Threads=" << thread_num << ") ====\n";
+  std::cout << "Total FPS: " << fps << std::endl;
+  std::cout << "Avg Latency: " << avg_latency << " ms\n";
+
+  // 写CSV
+  csv << thread_num << "," << fps << "," << avg_latency << "\n";
+
+  for (auto &w : workers)
+    w->release();
+}
 
 int main()
 {
@@ -144,69 +183,22 @@ int main()
       "model/liquid_960p.rknn",
       "model/wire_960p.rknn"};
 
-  int thread_num = 1; // 👉 先用1线程稳定
-  int run_time = 30;
+  int run_time = 20;
 
-  std::vector<std::shared_ptr<Worker>> workers;
+  std::ofstream csv("rknn_report.csv");
+  csv << "threads,fps,avg_latency(ms)\n";
 
-  std::cout << "==== RKNN C++ Stress Test (Safe Mode) ====\n";
+  std::cout << "==== RKNN Auto Stress Test ====\n";
 
-  // 初始化
-  for (int i = 0; i < thread_num; i++)
+  // 👉 自动跑1~4线程
+  for (int t = 1; t <= 4; t++)
   {
-    auto w = std::make_shared<Worker>(
-        models[i % models.size()],
-        0,
-        i);
-
-    if (!w->init())
-    {
-      std::cerr << "Init failed\n";
-      return -1;
-    }
-
-    workers.push_back(w);
+    run_test(t, models, run_time, csv);
   }
 
-  std::vector<std::thread> threads;
+  csv.close();
 
-  // 启动线程
-  for (auto &w : workers)
-  {
-    threads.emplace_back(&Worker::run, w);
-  }
-
-  auto start = std::chrono::steady_clock::now();
-  std::this_thread::sleep_for(std::chrono::seconds(run_time));
-
-  for (auto &w : workers)
-  {
-    w->stop();
-  }
-
-  for (auto &t : threads)
-  {
-    t.join();
-  }
-
-  auto end = std::chrono::steady_clock::now();
-  double total_time = std::chrono::duration<double>(end - start).count();
-
-  int total_count = 0;
-  for (int i = 0; i < workers.size(); i++)
-  {
-    double fps = workers[i]->count / total_time;
-    std::cout << "Thread-" << i << ": " << fps << " FPS\n";
-    total_count += workers[i]->count;
-  }
-
-  std::cout << "------------------\n";
-  std::cout << "Total FPS: " << total_count / total_time << std::endl;
-
-  for (auto &w : workers)
-  {
-    w->release();
-  }
+  std::cout << "\n📄 Report saved: rknn_report.csv\n";
 
   return 0;
 }
