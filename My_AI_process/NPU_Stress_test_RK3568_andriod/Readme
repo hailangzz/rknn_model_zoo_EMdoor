@@ -2,7 +2,7 @@
 
   进入 shell：  adb shell
 
-  进入目录：  cd /data/local/tmp/rknn_npu_stress_test_demo
+  进入目录：  cd /data/local/tmp/rknn_NPU_Stress_test_RK3568_andriod_demo
 
   授权：  chmod +x rknn_npu_stress_test_demo
 
@@ -23,3 +23,8 @@
 
 // 多线程压力,测试demo:  \
 ./rknn_npu_stress_test_demo --time 60 --threads 4 6 8 
+
+
+// 压测信息查看指令：
+  adb logcat | grep RKNN_BENCH
+  adb logcat -s RKNN_BENCH
