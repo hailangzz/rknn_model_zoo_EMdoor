@@ -113,6 +113,15 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
 
         object_detect_result *det = &od_results.results[i];
 
+        // ---------- 最大置信度 ----------
+        box_max_prop = std::max(box_max_prop, det->prop);
+
+        // ---------- 阈值过滤 ----------
+        if (det->prop < g_ctx.config.score_threshold)
+        {
+            continue;
+        }
+
         // ⭐⭐⭐ seg 安全获取 ⭐⭐⭐
         object_segment_result *seg = nullptr;
 
