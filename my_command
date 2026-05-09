@@ -25,6 +25,8 @@ onnx 模型转rknn:
   编译性能测试项目
     ./build-linux-my-program.sh -t rk3588 -a aarch64 -d NPU_Stress_test
 
+    ./build-android-my-program.sh -t rk3568 -a arm64-v8a -d NPU_Stress_test_RK3568_andriod
+
   编译yolov8_seg项目
     ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_seg_carpet
 

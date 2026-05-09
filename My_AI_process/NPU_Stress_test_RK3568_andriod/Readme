@@ -1,0 +1,25 @@
+// android平台RK3568 NPU压力测试demo,执行流程如下:
+
+  进入 shell：  adb shell
+
+  进入目录：  cd /data/local/tmp/rknn_npu_stress_test_demo
+
+  授权：  chmod +x rknn_npu_stress_test_demo
+
+  设置 so 路径：  export LD_LIBRARY_PATH=.
+
+  运行：  ./rknn_npu_stress_test_demo
+
+
+// 默认测试demo: \
+./rknn_npu_stress_test_demo 
+
+
+//指定运行时间
+./rknn_npu_stress_test_demo --time 60
+
+//指定线程数
+./rknn_npu_stress_test_demo --threads 2 4 6
+
+// 多线程压力,测试demo:  \
+./rknn_npu_stress_test_demo --time 60 --threads 4 6 8 
