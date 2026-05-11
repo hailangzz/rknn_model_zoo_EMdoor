@@ -1,41 +1,47 @@
 // yolov8_api.h
 #pragma once
 #include <opencv2/opencv.hpp>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef struct {
-    int left;
-    int top;
-    int right;
-    int bottom;
-} ObjectTargetBox;
+    typedef struct
+    {
+        int left;
+        int top;
+        int right;
+        int bottom;
+    } ObjectTargetBox;
 
-// 定义单个 3D 坐标结构体
-typedef struct {
-    float X;
-    float Y;
-    float Z;
-} CameraCoordinate;
+    // 定义单个 3D 坐标结构体
+    typedef struct
+    {
+        float X;
+        float Y;
+        float Z;
+    } CameraCoordinate;
 
-// 定义检测结果结构体
-typedef struct {    
-    ObjectTargetBox target_box;
-    float prop;                     // 置信度
-    int cls_id;                      // 类别 ID
-    std::vector<CameraCoordinate> coords;      // 最多存储 4 个 3D 坐标点                // 实际存储的坐标点数量
-    std::vector<CameraCoordinate> add_edge_point_single_pixel_camera_coordinates;     // 新增边缘点的轮廓相机坐标值
-    std::vector<std::vector<cv::Point>>  object_contours_mark_point;   // 存储轮廓点集
+    // 定义检测结果结构体
+    typedef struct
+    {
+        ObjectTargetBox target_box;
+        float prop;                                                                   // 置信度
+        int cls_id;                                                                   // 类别 ID
+        std::vector<CameraCoordinate> coords;                                         // 最多存储 4 个 3D 坐标点                // 实际存储的坐标点数量
+        std::vector<CameraCoordinate> add_edge_point_single_pixel_camera_coordinates; // 新增边缘点的轮廓相机坐标值
+        std::vector<std::vector<cv::Point>> object_contours_mark_point;               // 存储轮廓点集
 
+    } ObjectCameraDetectResult;
 
-} ObjectCameraDetectResult;
-
-
-bool base_model_init(const char* config_path);
-bool base_detect_infer(const cv::Mat& img,std::vector<ObjectCameraDetectResult>& results);
-void base_model_release();
+    bool base_model_init(const char *config_path);
+    bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult> &results);
+    // bool base_detect_infer_real(const cv::Mat &img, std::vector<ObjectCameraDetectResult> &results);
+    // bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult> &results, const Eigen::Vector3d &position, const Eigen::Quaterniond &q);
+    void base_model_release();
 
 #ifdef __cplusplus
 }

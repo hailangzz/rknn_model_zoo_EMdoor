@@ -25,7 +25,6 @@
 #include <vector>
 #define LABEL_NALE_TXT_PATH "./model/coco_80_labels_list.txt"
 
-
 static char *labels[OBJ_CLASS_NUM];
 
 int clamp(float val, int min, int max)
@@ -212,7 +211,6 @@ public:
     uint8_t *drm_buf;
 };
 
-
 void crop_mask_fp(float *seg_mask, uint8_t *all_mask_in_one, float *boxes, int boxes_num, int *cls_id, int height, int width)
 {
     for (int b = 0; b < boxes_num; b++)
@@ -351,7 +349,6 @@ void matmul_by_cpu_uint8(std::vector<float> &A, float *B, uint8_t *C, int ROWS_A
 //     // resize_by_rga_rk356x(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
 //     // resize_by_rga_rk3588(cropped_seg, cropped_width, cropped_height, seg_mask_real, ori_in_width, ori_in_height);
 // }
-
 
 void seg_reverse(uint8_t *seg_mask, uint8_t *cropped_seg, uint8_t *seg_mask_real,
                  int model_in_height, int model_in_width,
@@ -836,7 +833,6 @@ static int process_fp32(rknn_output *all_input, int input_id, int grid_h, int gr
 //                 model_in_height, model_in_width, cropped_height, cropped_width, ori_in_height, ori_in_width, y_pad, x_pad);
 
 //     od_results->results_seg[0].seg_mask = real_seg_mask;
- 
 
 //     free(all_mask_in_one);
 //     free(cropped_seg_mask);
@@ -880,7 +876,7 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     std::vector<float> filterBoxes;
     std::vector<float> objProbs;
     std::vector<int> classId;
-    
+
     std::vector<float> filterSegments;
     // float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
     int proto_size = PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT;
@@ -901,7 +897,7 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     int stride = 0;
     int grid_h = 0;
     int grid_w = 0;
-    
+
     memset(od_results, 0, sizeof(object_detect_result_list));
 
     int dfl_len = app_ctx->output_attrs[0].dims[1] / 4;
@@ -1013,7 +1009,7 @@ int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t 
     uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
     matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, boxes_num, PROTO_CHANNEL, PROTO_HEIGHT * PROTO_WEIGHT);
     resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
-    
+
 
     free(matmul_out);
 #endif
@@ -1379,7 +1375,7 @@ int post_process(rknn_app_context_t *app_ctx,
                         model_in_width);
 
         int cropped_height = model_in_height - letter_box->y_pad * 2;
-        int cropped_width  = model_in_width  - letter_box->x_pad * 2;
+        int cropped_width = model_in_width - letter_box->x_pad * 2;
 
         seg_reverse(single_mask,
                     cropped_seg_mask,
@@ -1396,7 +1392,6 @@ int post_process(rknn_app_context_t *app_ctx,
 
     return 0;
 }
-
 
 int init_post_process()
 {
@@ -1415,7 +1410,7 @@ char *coco_cls_to_name(int cls_id)
 
     if (cls_id >= OBJ_CLASS_NUM)
     {
-        return (char*)"null";
+        return (char *)"null";
     }
 
     if (labels[cls_id])
@@ -1423,7 +1418,7 @@ char *coco_cls_to_name(int cls_id)
         return labels[cls_id];
     }
 
-    return (char*)"null";
+    return (char *)"null";
 }
 
 void deinit_post_process()
@@ -1436,7 +1431,6 @@ void deinit_post_process()
         }
     }
 }
-
 
 // void extract_seg_mask_contours(object_detect_result_list &od_results,
 //                                int target_index,
@@ -1491,7 +1485,7 @@ void deinit_post_process()
 // }
 
 void extract_seg_mask_contours(
-    object_segment_result* seg,       // 只操作单个目标的 seg_mask
+    object_segment_result *seg, // 只操作单个目标的 seg_mask
     int width,
     int height,
     std::vector<std::vector<cv::Point>> &out_contours)
@@ -1535,7 +1529,8 @@ void extract_seg_mask_contours(
     // 统计总点数并打印
     // -----------------------------
     int total_points = 0;
-    for (const auto& cnt : out_contours) {
+    for (const auto &cnt : out_contours)
+    {
         total_points += static_cast<int>(cnt.size());
     }
     printf("extract_seg_mask_contours: total contours = %zu, total points = %d\n",
@@ -1550,35 +1545,36 @@ void extract_seg_mask_contours(
 
 // 对mark区域边缘，做移动平滑，减弱mark检测边缘的锯齿型抖动。
 void smoothContour(
-    const std::vector<cv::Point>& input,
-    std::vector<cv::Point>& output,
+    const std::vector<cv::Point> &input,
+    std::vector<cv::Point> &output,
     int win)
 {
     output.clear();
     int n = input.size();
-    if (n < win) {
+    if (n < win)
+    {
         output = input;
         return;
     }
 
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
+    {
         int count = 0;
         float sx = 0, sy = 0;
-        for (int k = -win/2; k <= win/2; ++k) {
-            int idx = (i + k + n) % n;  // 闭合轮廓
+        for (int k = -win / 2; k <= win / 2; ++k)
+        {
+            int idx = (i + k + n) % n; // 闭合轮廓
             sx += input[idx].x;
             sy += input[idx].y;
             count++;
         }
         output.emplace_back(
             static_cast<int>(sx / count),
-            static_cast<int>(sy / count)
-        );
+            static_cast<int>(sy / count));
     }
 }
 
-
-inline float estimateDistance(float x,ConfigInfo & config)
+inline float estimateDistance(float x, ConfigInfo &config)
 {
     float polyfit_result;
     polyfit_result = config.camera_z_axle_top_resize_rate * x;
@@ -1591,9 +1587,9 @@ inline float estimateDistance(float x,ConfigInfo & config)
 // 将 object_detect_result 填充到 ObjectCameraDetectResult
 // =========================
 void fillCameraDetectResult(
-    const object_detect_result* det,
-    ObjectCameraDetectResult& one,
-    ConfigInfo& config)
+    const object_detect_result *det,
+    ObjectCameraDetectResult &one,
+    ConfigInfo &config)
 {
     // printf("enter Filling camera detect result for one object...\n");
     // printf("edge ptr = %p, num = %d\n",
@@ -1601,7 +1597,7 @@ void fillCameraDetectResult(
     //    det->camera_coordinates.add_edge_point_num);
 
     // ---------- 1. 类别 & 置信度 ----------
-    one.prop   = det->prop;
+    one.prop = det->prop;
     one.cls_id = config.BASE_AREA;
 
     // printf("det->box.top = %d\n", det->box.top);
@@ -1629,11 +1625,11 @@ void fillCameraDetectResult(
     one.coords[3].Z = estimateDistance(det->camera_coordinates.left_bottom.Z, config);
 
     // ---------- 3. 目标框 ----------
-    one.target_box.top    = det->box.top;
+    one.target_box.top = det->box.top;
     one.target_box.bottom = det->box.bottom;
-    one.target_box.left   = det->box.left;
-    one.target_box.right  = det->box.right;
-    
+    one.target_box.left = det->box.left;
+    one.target_box.right = det->box.right;
+
     // printf("det->box.top = %d\n", det->box.top);
     // printf("det->box.bottom = %d\n", det->box.bottom);
     // printf("det->box.left = %d\n", det->box.left);
@@ -1649,25 +1645,27 @@ void fillCameraDetectResult(
     one.add_edge_point_single_pixel_camera_coordinates.clear();
 
     const int edge_num = det->camera_coordinates.add_edge_point_num;
-    const auto* edge_src =
+    const auto *edge_src =
         det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates;
 
-    if (edge_num <= 0 || edge_src == nullptr) {
+    if (edge_num <= 0 || edge_src == nullptr)
+    {
         printf("No edge points for this object (edge_num = %d)\n", edge_num);
         return;
     }
 
     one.add_edge_point_single_pixel_camera_coordinates.resize(edge_num);
 
-    for (int i = 0; i < edge_num; ++i) {
-        const single_pixel_camera_coordinates& src = edge_src[i];
+    for (int i = 0; i < edge_num; ++i)
+    {
+        const single_pixel_camera_coordinates &src = edge_src[i];
 
         one.add_edge_point_single_pixel_camera_coordinates[i].X = src.X;
         one.add_edge_point_single_pixel_camera_coordinates[i].Y = src.Y;
         one.add_edge_point_single_pixel_camera_coordinates[i].Z =
             estimateDistance(src.Z, config);
     }
-    printf("edge_num = %d\n", edge_num);    
+    printf("edge_num = %d\n", edge_num);
 }
 
 /*
@@ -1753,7 +1751,7 @@ void filter_mask_contours(
         // -----------------------------
         // 作用：去除小噪点 / 小碎片（YOLOv8 seg常见问题）
         double area = cv::contourArea(cnt);
-        if (area < 200)   // ⚠️ 可调参数：建议根据分辨率调 (100~1000)
+        if (area < 200) // ⚠️ 可调参数：建议根据分辨率调 (100~1000)
             continue;
 
         // -----------------------------
@@ -1776,7 +1774,7 @@ void filter_mask_contours(
         double perimeter = cv::arcLength(cnt, true);
 
         // 作用：进一步过滤过小或不规则轮廓
-        if (perimeter < 50)   // ⚠️ 可调参数
+        if (perimeter < 50) // ⚠️ 可调参数
             continue;
 
         // -----------------------------
@@ -1788,7 +1786,7 @@ void filter_mask_contours(
         // 作用：
         // - 过滤“很空”的区域（例如细线、噪声、破碎mask）
         // - 对扫地机器人识别电线特别有效
-        if (fill_ratio < 0.2)   // ⚠️ 可调参数（0.1~0.5）
+        if (fill_ratio < 0.2) // ⚠️ 可调参数（0.1~0.5）
             continue;
 
         // -----------------------------

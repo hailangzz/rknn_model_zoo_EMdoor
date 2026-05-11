@@ -5,12 +5,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "image_drawing.h"
+#include "map.h"
 
 static DetectContext g_ctx;
 
-bool base_model_init(const char* config_path)
+bool base_model_init(const char *config_path)
 {
-    if (g_ctx.initialized) {
+    if (g_ctx.initialized)
+    {
         printf("carpet model already initialized");
         return true;
     }
@@ -20,100 +22,180 @@ bool base_model_init(const char* config_path)
 
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
-    
-    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images,g_ctx.config.fps_limit);
+
+    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path, g_ctx.config.is_save_debug_images, g_ctx.config.fps_limit);
+
+    g_ctx.g_pose_sampler = new visual_localization::PoseSampler();
     g_ctx.initialized = true;
 
     printf("carpet_model_init success");
     return true;
 }
 
-// ================= 保存结果图像 =================
-
-
-bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>& results)
+// ============================================================
+// 原始推理接口
+// ============================================================
+// bool base_detect_infer_real(
+bool base_detect_infer(
+    const cv::Mat &img,
+    std::vector<ObjectCameraDetectResult> &results)
 {
     results.clear();
 
-    // ================= 安全检查 =================
-    if (!g_ctx.initialized || !g_ctx.detector || !g_ctx.camera_params || img.empty()) {
+    // ========================================================
+    // 安全检查
+    // ========================================================
+
+    if (!g_ctx.initialized ||
+        !g_ctx.detector ||
+        !g_ctx.camera_params ||
+        img.empty())
+    {
         printf("model not initialized or empty image\n");
         return false;
     }
 
-    // ================= Mat 处理 =================
+    // ========================================================
+    // Mat处理
+    // ========================================================
+
     cv::Mat img_rgb;
-    if (img.channels() == 4) {
-        cv::cvtColor(img, img_rgb, cv::COLOR_RGBA2RGB);
-    } else if (img.channels() == 1) {
-        cv::cvtColor(img, img_rgb, cv::COLOR_GRAY2RGB);
-    } else {
+
+    if (img.channels() == 4)
+    {
+        cv::cvtColor(
+            img,
+            img_rgb,
+            cv::COLOR_RGBA2RGB);
+    }
+    else if (img.channels() == 1)
+    {
+        cv::cvtColor(
+            img,
+            img_rgb,
+            cv::COLOR_GRAY2RGB);
+    }
+    else
+    {
         img_rgb = img;
     }
 
-    if (!img_rgb.isContinuous()) {
+    if (!img_rgb.isContinuous())
+    {
         img_rgb = img_rgb.clone();
     }
 
-    // ================= 构造输入 =================
+    // ========================================================
+    // 构造输入
+    // ========================================================
+
     image_buffer_t src_image;
-    memset(&src_image, 0, sizeof(image_buffer_t));
 
-    size_t buffer_size = img_rgb.total() * img_rgb.elemSize();
+    memset(
+        &src_image,
+        0,
+        sizeof(image_buffer_t));
 
-    if (posix_memalign((void**)&src_image.virt_addr, 64, buffer_size) != 0) {
+    size_t buffer_size =
+        img_rgb.total() *
+        img_rgb.elemSize();
+
+    if (posix_memalign(
+            (void **)&src_image.virt_addr,
+            64,
+            buffer_size) != 0)
+    {
         printf("failed to allocate aligned memory\n");
         return false;
     }
 
-    memcpy(src_image.virt_addr, img_rgb.data, buffer_size);
+    memcpy(
+        src_image.virt_addr,
+        img_rgb.data,
+        buffer_size);
 
-    src_image.width  = img_rgb.cols;
-    src_image.height = img_rgb.rows;
-    src_image.format = IMAGE_FORMAT_RGB888;
-    src_image.size   = buffer_size;
+    src_image.width =
+        img_rgb.cols;
 
-    // ================= 推理 =================
+    src_image.height =
+        img_rgb.rows;
+
+    src_image.format =
+        IMAGE_FORMAT_RGB888;
+
+    src_image.size =
+        buffer_size;
+
+    // ========================================================
+    // 推理
+    // ========================================================
+
     object_detect_result_list od_results;
-    memset(&od_results, 0, sizeof(od_results));
 
-    int ret = g_ctx.detector->inference_yolov8_model(&src_image, &od_results);
-    if (ret != 0) {
+    memset(
+        &od_results,
+        0,
+        sizeof(od_results));
+
+    int ret =
+        g_ctx.detector->inference_yolov8_model(
+            &src_image,
+            &od_results);
+
+    if (ret != 0)
+    {
         printf("yolov8 inference failed\n");
+
         free(src_image.virt_addr);
+
         return false;
     }
 
-    // ================= 统计 =================
-    float box_max_prop = std::numeric_limits<float>::lowest();
+    // ========================================================
+    // 统计
+    // ========================================================
 
-    // ================= 遍历检测结果 =================
-    for (int i = 0; i < od_results.count; i++) {
+    float box_max_prop =
+        std::numeric_limits<float>::lowest();
 
-        // ---------- results 安全 ----------
-        if (!od_results.results) {
+    // ========================================================
+    // 遍历检测结果
+    // ========================================================
+
+    for (int i = 0; i < od_results.count; i++)
+    {
+        if (!od_results.results)
+        {
             printf("results is null!\n");
             break;
         }
 
-        object_detect_result* det = &od_results.results[i];
+        object_detect_result *det =
+            &od_results.results[i];
 
-        // ---------- 最大置信度 ----------
-        box_max_prop = std::max(box_max_prop, det->prop);
+        box_max_prop =
+            std::max(
+                box_max_prop,
+                det->prop);
 
-        // ---------- 阈值过滤 ----------
-        if (det->prop < g_ctx.config.score_threshold) {
+        // 阈值过滤
+        if (det->prop <
+            g_ctx.config.score_threshold)
+        {
             continue;
         }
 
-        // ---------- seg 安全 ----------
-        if (!od_results.results_seg) {
+        if (!od_results.results_seg)
+        {
             printf("results_seg is null!\n");
             continue;
         }
 
-        object_segment_result* seg = &od_results.results_seg[i];
-        if (!seg) {
+        object_segment_result *seg =
+            &od_results.results_seg[i];
+
+        if (!seg)
+        {
             printf("seg ptr invalid!\n");
             continue;
         }
@@ -121,90 +203,206 @@ bool base_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>
         ObjectCameraDetectResult one;
 
         std::vector<std::vector<cv::Point>> contours;
+
         std::vector<std::vector<cv::Point>> contours_filtered;
+
         std::vector<std::vector<cv::Point>> contours_smoothed;
 
-        // ---------- 提取轮廓 ----------
-        extract_seg_mask_contours(seg, src_image.width, src_image.height, contours);
+        // ====================================================
+        // 提取轮廓
+        // ====================================================
 
-        int total_points = 0;
-        for (const auto& c : contours) {
-            total_points += c.size();
+        extract_seg_mask_contours(
+            seg,
+            src_image.width,
+            src_image.height,
+            contours);
+
+        // ====================================================
+        // 过滤轮廓
+        // ====================================================
+
+        filter_mask_contours(
+            contours,
+            contours_filtered);
+
+        // ====================================================
+        // 平滑轮廓
+        // ====================================================
+
+        contours_smoothed.resize(
+            contours_filtered.size());
+
+        for (size_t j = 0;
+             j < contours_filtered.size();
+             j++)
+        {
+            smoothContour(
+                contours_filtered[j],
+                contours_smoothed[j]);
         }
-        printf("det[%d] total points = %d\n", i, total_points);
 
-        // ---------- 过滤 ----------
-        filter_mask_contours(contours, contours_filtered);
+        // ====================================================
+        // 存储轮廓
+        // ====================================================
 
-        // ---------- 平滑 ----------
-        contours_smoothed.resize(contours_filtered.size());
-        for (size_t j = 0; j < contours_filtered.size(); j++) {
-            smoothContour(contours_filtered[j], contours_smoothed[j]);
-        }
+        one.object_contours_mark_point =
+            contours_filtered;
 
-        // ---------- 存储 ----------
-        one.object_contours_mark_point = contours_filtered;
+        memset(
+            &det->camera_coordinates,
+            0,
+            sizeof(box_camera_coordinates));
 
-        memset(&det->camera_coordinates, 0, sizeof(box_camera_coordinates));
+        // ====================================================
+        // 转换相机坐标
+        // ====================================================
 
-        g_ctx.camera_params->ObjectboxToCameraXYZ(det, contours_filtered);
+        g_ctx.camera_params->ObjectboxToCameraXYZ(
+            det,
+            contours_filtered);
 
-        fillCameraDetectResult(det, one, g_ctx.config);
+        // ====================================================
+        // 填充结果
+        // ====================================================
+
+        fillCameraDetectResult(
+            det,
+            one,
+            g_ctx.config);
 
         results.push_back(one);
 
-        // ---------- 尺寸计算 ----------
+        // ====================================================
+        // 尺寸计算
+        // ====================================================
+
         ObjectSize3D size;
-        calcObjectSizeByAverage(one, size);
+
+        calcObjectSizeByAverage(
+            one,
+            size);
     }
 
-    // ================= Debug 保存 =================
-    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold) {
-        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
+    // ========================================================
+    // Debug保存
+    // ========================================================
+
+    if (g_ctx.debuger &&
+        box_max_prop >
+            g_ctx.config.debug_score_threshold)
+    {
+        g_ctx.debuger->saveIfDetected(
+            img,
+            "carpet_detect");
     }
 
-    // ================= Debug 输出 =================
-    printf("od_results.count: %d\n", od_results.count);
+    // ========================================================
+    // Debug输出
+    // ========================================================
 
-    for (size_t i = 0; i < results.size(); i++) {
+    printf("od_results.count: %d\n",
+           od_results.count);
+
+    for (size_t i = 0;
+         i < results.size();
+         i++)
+    {
         printf("det.cls_id:%d, det.prop:%f\n",
                results[i].cls_id,
                results[i].prop);
     }
 
-    // ================= 释放 seg_mask（⚠️需确认） =================
-    if (od_results.results_seg) {
-        for (int i = 0; i < od_results.count; i++) {
-            if (od_results.results_seg[i].seg_mask) {
-                free(od_results.results_seg[i].seg_mask);
-                od_results.results_seg[i].seg_mask = nullptr;
+    // ========================================================
+    // 释放 seg mask
+    // ========================================================
+
+    if (od_results.results_seg)
+    {
+        for (int i = 0;
+             i < od_results.count;
+             i++)
+        {
+            if (od_results.results_seg[i].seg_mask)
+            {
+                free(
+                    od_results.results_seg[i].seg_mask);
+
+                od_results.results_seg[i].seg_mask =
+                    nullptr;
             }
         }
     }
 
-    // ================= 释放输入 =================
+    // ========================================================
+    // 释放输入
+    // ========================================================
+
     free(src_image.virt_addr);
 
     return !results.empty();
 }
 
+// ============================================================
+// 新增：带空间位姿采样的推理接口
+// ============================================================
+
+// bool base_detect_infer(
+//     const cv::Mat &img,
+//     std::vector<ObjectCameraDetectResult> &results,
+//     const Eigen::Vector3d &position,
+//     const Eigen::Quaterniond &q)
+// {
+//     // ========================================================
+//     // 判断是否需要保存/推理
+//     // ========================================================
+
+//     bool need_save =
+//         g_ctx.g_pose_sampler->NeedSaveFrame(
+//             position,
+//             q);
+
+//     if (!need_save)
+//     {
+//         printf("skip infer, duplicated pose area\n");
+
+//         return false;
+//     }
+
+//     printf("new pose area, start infer\n");
+
+//     // ========================================================
+//     // 调用原始推理
+//     // ========================================================
+
+//     return base_detect_infer_real(
+//         img,
+//         results);
+// }
+
+// ============================================================
+// 模型释放
+// ============================================================
 
 void base_model_release()
 {
     if (!g_ctx.initialized)
+    {
         return;
+    }
 
     deinit_post_process();
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
     delete g_ctx.debuger;
+    delete g_ctx.g_pose_sampler;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
     g_ctx.debuger = nullptr;
+    g_ctx.g_pose_sampler = nullptr;
     g_ctx.initialized = false;
 
-    printf("carpet_model_release finished");
+    printf("carpet_model_release finished\n");
 }
-
