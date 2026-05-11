@@ -11,6 +11,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "rknn_api.h"
 
@@ -50,9 +52,7 @@ CpuStat read_cpu()
   return s;
 }
 
-double calc_cpu(
-    const CpuStat &a,
-    const CpuStat &b)
+double calc_cpu(const CpuStat &a, const CpuStat &b)
 {
   long long idle =
       b.idle - a.idle;
@@ -110,7 +110,6 @@ double get_mem_usage()
 
 // =====================================================
 // NPU
-// Android12 通常无法访问 debugfs
 // =====================================================
 
 struct NpuLoad
@@ -125,35 +124,73 @@ struct NpuLoad
 
 NpuLoad get_npu_usage()
 {
-  std::ifstream f(
-      "/sys/kernel/debug/rknpu/load");
+  FILE *fp =
+      popen("cat /sys/kernel/debug/rknpu/load", "r");
 
-  if (!f.is_open())
+  if (!fp)
   {
     return {-1, -1, -1, -1, -1};
   }
 
-  std::string line;
+  char buf[256] = {0};
 
-  std::getline(f, line);
+  if (!fgets(buf, sizeof(buf), fp))
+  {
+    pclose(fp);
+    return {-1, -1, -1, -1, -1};
+  }
+
+  pclose(fp);
+
+  LOGI("RAW NPU BUF=%s", buf);
 
   NpuLoad n;
 
-  sscanf(
-      line.c_str(),
-      "NPU load: Core0: %d%%, Core1: %d%%, Core2: %d%%",
-      &n.core0,
-      &n.core1,
-      &n.core2);
+  std::vector<int> nums;
 
-  n.avg =
-      (n.core0 + n.core1 + n.core2) / 3.0;
+  char *p = buf;
 
-  n.peak =
-      std::max(
-          {n.core0,
-           n.core1,
-           n.core2});
+  while (*p)
+  {
+    if (isdigit(*p))
+    {
+      nums.push_back(strtol(p, &p, 10));
+    }
+    else
+    {
+      p++;
+    }
+  }
+
+  if (nums.size() >= 3)
+  {
+    n.core0 = nums[0];
+    n.core1 = nums[1];
+    n.core2 = nums[2];
+
+    n.avg =
+        (n.core0 + n.core1 + n.core2) / 3.0;
+
+    n.peak =
+        std::max(
+            {n.core0,
+             n.core1,
+             n.core2});
+  }
+  else if (nums.size() == 1)
+  {
+    n.core0 =
+        n.core1 =
+            n.core2 =
+                nums[0];
+
+    n.avg = nums[0];
+    n.peak = nums[0];
+  }
+  else
+  {
+    return {-1, -1, -1, -1, -1};
+  }
 
   return n;
 }
@@ -165,22 +202,22 @@ NpuLoad get_npu_usage()
 struct Args
 {
   std::string model =
-      "/data/local/tmp/rknn_bench/model.rknn";
+      "./model/liquid_960p.rknn";
 
   std::string output =
-      "/data/local/tmp/rknn_bench/report.csv";
+      "./report.csv";
 
-  int run_time = 10;
+  int run_time = 60;
 
   std::vector<int> threads =
-      {1, 2, 3, 4};
+      {3, 4, 6, 8};
 };
 
 void usage()
 {
   LOGI(
       "Usage:\n"
-      "./rknn_bench "
+      "./rknn_npu_stress_test_demo "
       "[--model xxx.rknn] "
       "[--output xxx.csv] "
       "[--time 10] "
@@ -467,15 +504,10 @@ void run_test(
     int run_time,
     std::ofstream &csv)
 {
-  LOGI(
-      "==============================");
+  LOGI("==================================");
+  LOGI("THREAD=%d", thread_num);
 
-  LOGI(
-      "THREAD=%d",
-      thread_num);
-
-  std::vector<
-      std::shared_ptr<Worker>>
+  std::vector<std::shared_ptr<Worker>>
       workers;
 
   for (int i = 0; i < thread_num; i++)
@@ -500,16 +532,6 @@ void run_test(
   CpuStat prev = read_cpu();
 
   long long total_fps = 0;
-
-  double cpu_sum = 0;
-
-  double mem_sum = 0;
-
-  double npu_sum = 0;
-
-  double npu_peak = 0;
-
-  int npu_cnt = 0;
 
   int last = 0;
 
@@ -547,22 +569,6 @@ void run_test(
 
     total_fps += fps;
 
-    cpu_sum += cpu;
-
-    mem_sum += mem;
-
-    if (npu.avg >= 0)
-    {
-      npu_sum += npu.avg;
-
-      npu_peak =
-          std::max(
-              npu_peak,
-              npu.peak);
-
-      npu_cnt++;
-    }
-
     LOGI(
         "[T=%d] FPS=%d CPU=%.2f%% MEM=%.2f%% NPU=%.2f%%",
         thread_num,
@@ -586,46 +592,11 @@ void run_test(
       total_fps /
       (double)run_time;
 
-  double cpu_avg =
-      cpu_sum / run_time;
-
-  double mem_avg =
-      mem_sum / run_time;
-
-  double npu_avg =
-      npu_cnt > 0
-          ? npu_sum / npu_cnt
-          : -1;
-
-  LOGI("===== RESULT =====");
-
-  LOGI(
-      "THREAD=%d",
-      thread_num);
-
-  LOGI(
-      "FPS=%.2f",
-      avg_fps);
-
-  LOGI(
-      "CPU=%.2f%%",
-      cpu_avg);
-
-  LOGI(
-      "MEM=%.2f%%",
-      mem_avg);
-
-  LOGI(
-      "NPU=%.2f%%",
-      npu_avg);
+  LOGI("RESULT FPS=%.2f", avg_fps);
 
   csv
       << thread_num << ","
-      << avg_fps << ","
-      << cpu_avg << ","
-      << mem_avg << ","
-      << npu_avg << ","
-      << npu_peak
+      << avg_fps
       << "\n";
 
   csv.flush();
@@ -639,25 +610,22 @@ int main(
     int argc,
     char **argv)
 {
-  LOGI(
-      "RKNN Benchmark Start");
+  LOGI("RKNN Benchmark Start");
 
   Args args =
       parse_args(argc, argv);
 
-  LOGI(
-      "model=%s",
-      args.model.c_str());
+  LOGI("model=%s",
+       args.model.c_str());
 
-  LOGI(
-      "output=%s",
-      args.output.c_str());
+  LOGI("output=%s",
+       args.output.c_str());
 
-  LOGI(
-      "run_time=%d",
-      args.run_time);
+  LOGI("run_time=%d",
+       args.run_time);
 
-  std::ofstream csv(args.output);
+  std::ofstream csv(
+      args.output);
 
   if (!csv.is_open())
   {
@@ -667,13 +635,7 @@ int main(
     return -1;
   }
 
-  csv
-      << "threads,"
-      << "fps,"
-      << "cpu,"
-      << "mem,"
-      << "npu_avg,"
-      << "npu_peak\n";
+  csv << "threads,fps\n";
 
   for (auto t : args.threads)
   {
@@ -686,12 +648,7 @@ int main(
 
   csv.close();
 
-  LOGI(
-      "saved csv=%s",
-      args.output.c_str());
-
-  LOGI(
-      "benchmark done");
+  LOGI("benchmark done");
 
   return 0;
 }

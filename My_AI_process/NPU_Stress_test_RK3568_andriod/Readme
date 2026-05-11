@@ -1,4 +1,5 @@
 // android平台RK3568 NPU压力测试demo,执行流程如下:
+  先将项目，拷贝到安卓板端：/data/local/tmp 路径下
 
   进入 shell：  adb shell
 
@@ -6,7 +7,7 @@
 
   授权：  chmod +x rknn_npu_stress_test_demo
 
-  设置 so 路径：  export LD_LIBRARY_PATH=.
+  设置 so 路径：  export LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH
 
   运行：  ./rknn_npu_stress_test_demo
 
@@ -24,7 +25,17 @@
 // 多线程压力,测试demo:  \
 ./rknn_npu_stress_test_demo --time 60 --threads 4 6 8 
 
+// 指定模型路径,测试demo:  \
+  ./rknn_npu_stress_test_demo \
+  --model ./model/liquid_960p.rknn \
+  --output ./report.csv \
+  --time 30 \
+  --threads 1 2 3 4
+
 
 // 压测信息查看指令：
   adb logcat | grep RKNN_BENCH
   adb logcat -s RKNN_BENCH
+
+// 实际NPU占用信息查询：
+  cat /sys/kernel/debug/rknpu/load
