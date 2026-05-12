@@ -1,24 +1,29 @@
 // git 提交项目标签时命令
-  git tag -a v1.0 -m "版本1.0"
-  git push origin v1.0  
+git tag -a v1.0 -m "版本1.0"
+git push origin v1.0  
+git tag -a releasev1.0.0 331a2bc  -m "稳定版的调试项目"
+
+// 推送远程标签 （Git 的 tag（标签）本质上：是直接指向某个 commit 的引用，而不是属于某个分支）
+git push origin releasev1.0.0
+
 //git 删除标签
-  git tag -d v1.0
-  git push origin --delete v1.0
+git tag -d v1.0
+git push origin --delete v1.0
 //git显示标签信息
-  git show v1.0
+git show v1.0
 
 // git 提交项目分支时命令
-  git checkout -b new_branch
-  git add .
-  git commit -m "提交新分支"
-  git push origin new_branch
+git checkout -b new_branch
+git add .
+git commit -m "提交新分支"
+git push origin new_branch
 
 //git 合并分支时命令
-  git checkout main
-  git merge new_branch
-  git push origin main
+git checkout main
+git merge new_branch
+git push origin main
 
-  // git恢复文件夹内容，到指定提交
-  git restore --source <commit_id> path/to/folder/
+// git恢复文件夹内容，到指定提交
+git restore --source <commit_id> path/to/folder/
 
-  git restore --source other-branch path/to/folder/
+git restore --source other-branch path/to/folder/
