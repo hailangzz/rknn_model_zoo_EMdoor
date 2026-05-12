@@ -272,3 +272,53 @@ void Debug::saveIfDetected(
             << std::endl;
     }
 }
+
+void Debug::setDebugImageSavePath(const std::string &path)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    debug_image_save_path_ = path;
+
+    if (!createDirectories(debug_image_save_path_))
+    {
+        std::cerr
+            << "[Debug] create dir failed: "
+            << debug_image_save_path_
+            << std::endl;
+    }
+    else
+    {
+        std::cout
+            << "[Debug] save path: "
+            << debug_image_save_path_
+            << std::endl;
+    }
+}
+
+void Debug::updateSavedPoseImageCount(bool is_exist_target)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (is_exist_target)
+    {
+        saved_pose_exist_target_image_count_++;
+    }
+    else
+    {
+        saved_pose_null_target_image_count_++;
+    }
+}
+
+int Debug::getSavedPoseImageCount(bool is_exist_target)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (is_exist_target)
+    {
+        return saved_pose_exist_target_image_count_;
+    }
+    else
+    {
+        return saved_pose_null_target_image_count_;
+    }
+}

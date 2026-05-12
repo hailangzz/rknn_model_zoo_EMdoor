@@ -58,6 +58,8 @@ namespace visual_localization
         const Eigen::Vector3d &position,
         const Eigen::Quaterniond &q);
 
+    bool IsPoseSaveImage = false; // 是否符合空间位置，保存图像条件
+
   private:
     PoseKey ComputePoseKey(
         const Eigen::Vector3d &position,

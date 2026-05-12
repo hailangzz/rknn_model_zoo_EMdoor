@@ -36,7 +36,7 @@ bool base_model_init(const char *config_path)
 // 原始推理接口
 // ============================================================
 // bool base_detect_infer_real(
-bool base_detect_infer(
+bool real_detect_infer(
     const cv::Mat &img,
     std::vector<ObjectCameraDetectResult> &results)
 {
@@ -288,14 +288,52 @@ bool base_detect_infer(
     // Debug保存
     // ========================================================
 
-    if (g_ctx.debuger &&
-        box_max_prop >
-            g_ctx.config.debug_score_threshold)
+    if (g_ctx.debuger) // 调试模式下
     {
-        g_ctx.debuger->saveIfDetected(
-            img,
-            "carpet_detect");
+        if (g_ctx.g_pose_sampler->IsPoseSaveImage) // 空间位置符合条件
+        {
+            bool is_useful_prop = box_max_prop > g_ctx.config.score_threshold;
+            g_ctx.debuger->updateSavedPoseImageCount(is_useful_prop); // 更新基于空间的，图像目标有效性计数
+
+            if (is_useful_prop) // 置信度符合条件
+            {
+                std::string save_name =
+                    "carpet_detect_exist_target_" +
+                    std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
+
+                g_ctx.debuger->saveIfDetected(
+                    img,
+                    save_name); // 保存到存在目标的文件夹
+            }
+            else
+            {
+                std::string save_name =
+                    "carpet_detect_null_target" +
+                    std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
+                g_ctx.debuger->saveIfDetected(
+                    img,
+                    save_name); // 保存到不存在目标的文件夹
+            }
+        }
+        else // 空间位置不符合条件
+        {
+            if (box_max_prop > g_ctx.config.debug_score_threshold) // 置信度符合,感兴趣阈值。则进行保存，主要用于分析空间位置不符合条件时，是否存在高置信度的检测结果
+            {
+                g_ctx.debuger->saveIfDetected(
+                    img,
+                    "carpet_detect");
+            }
+        }
     }
+
+    // if (g_ctx.debuger &&
+    //     box_max_prop >
+    //         g_ctx.config.debug_score_threshold)
+    // {
+    //     g_ctx.debuger->saveIfDetected(
+    //         img,
+    //         "carpet_detect");
+    // }
 
     // ========================================================
     // Debug输出
@@ -347,42 +385,43 @@ bool base_detect_infer(
 // 新增：带空间位姿采样的推理接口
 // ============================================================
 
-// bool base_detect_infer(
-//     const cv::Mat &img,
-//     std::vector<ObjectCameraDetectResult> &results,
-//     const Eigen::Vector3d &position,
-//     const Eigen::Quaterniond &q)
-// {
-//     // ========================================================
-//     // 判断是否需要保存/推理
-//     // ========================================================
+bool base_detect_infer(
+    const cv::Mat &img,
+    std::vector<ObjectCameraDetectResult> &results,
+    const Eigen::Vector3d &position,
+    const Eigen::Quaterniond &q)
+{
+    // ========================================================
+    // 判断是否需要保存/推理
+    // ========================================================
 
-//     bool need_save =
-//         g_ctx.g_pose_sampler->NeedSaveFrame(
-//             position,
-//             q);
+    g_ctx.g_pose_sampler->IsPoseSaveImage =
+        g_ctx.g_pose_sampler->NeedSaveFrame(
+            position,
+            q);
 
-//     if (!need_save)
-//     {
-//         printf("skip infer, duplicated pose area\n");
+    if (!g_ctx.g_pose_sampler->IsPoseSaveImage)
+    {
+        g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_debug_images_path);
 
-//         return false;
-//     }
+        printf("skip infer, duplicated pose area\n");
+    }
+    else
+    {
+        g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_images_path_spatial_location_val);
+    }
 
-//     printf("new pose area, start infer\n");
+    // ========================================================
+    // 调用原始推理
+    // ========================================================
 
-//     // ========================================================
-//     // 调用原始推理
-//     // ========================================================
+    return real_detect_infer(
+        img,
+        results);
+}
 
-//     return base_detect_infer_real(
-//         img,
-//         results);
-// }
-
-// ============================================================
-// 模型释放
-// ============================================================
+// == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+//     模型释放 == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
 
 void base_model_release()
 {
