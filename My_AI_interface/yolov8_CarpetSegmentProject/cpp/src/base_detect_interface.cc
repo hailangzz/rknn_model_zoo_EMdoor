@@ -308,7 +308,7 @@ bool real_detect_infer(
             else
             {
                 std::string save_name =
-                    "carpet_detect_null_target" +
+                    "carpet_detect_null_target_" +
                     std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
                 g_ctx.debuger->saveIfDetected(
                     img,
