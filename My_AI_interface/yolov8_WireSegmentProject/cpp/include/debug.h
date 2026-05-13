@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <atomic>
 #include <chrono>
-
+#include <fstream>
 #include "image_utils.h"
 
 #include <mutex>
@@ -18,6 +18,7 @@ public:
 
     // 保存图像（检测到目标时调用）
     void saveIfDetected(const cv::Mat &image, const std::string &tag = "");
+    void saveSegLabel(const cv::Mat &image, const std::vector<std::vector<cv::Point>> &contours, const std::vector<int> &cls_ids, const std::string &tag = "");
 
     // 更改图像保存路径
     void setDebugImageSavePath(const std::string &path);

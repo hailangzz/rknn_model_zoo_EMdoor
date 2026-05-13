@@ -315,3 +315,191 @@ int Debug::getSavedPoseImageCount(bool is_exist_target)
         return saved_pose_null_target_image_count_;
     }
 }
+
+void Debug::saveSegLabel(
+    const cv::Mat &image,
+    const std::vector<std::vector<cv::Point>> &contours,
+    const std::vector<int> &cls_ids,
+    const std::string &tag)
+{
+    // =================================================
+    // 开关检查
+    // =================================================
+
+    if (!is_save_debug_image_)
+    {
+        return;
+    }
+
+    if (image.empty())
+    {
+        std::cerr
+            << "[Debug] saveSegLabel image empty"
+            << std::endl;
+
+        return;
+    }
+
+    if (contours.empty())
+    {
+        std::cerr
+            << "[Debug] contours empty"
+            << std::endl;
+
+        return;
+    }
+
+    // contour 和 class 数量必须一致
+    if (contours.size() != cls_ids.size())
+    {
+        std::cerr
+            << "[Debug] contours.size != cls_ids.size"
+            << std::endl;
+
+        return;
+    }
+
+    // =================================================
+    // 锁
+    // =================================================
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    // =================================================
+    // 文件名
+    // =================================================
+
+    std::string image_filename =
+        generateFileName(tag);
+
+    // jpg -> txt
+    std::string label_filename =
+        image_filename.substr(
+            0,
+            image_filename.find_last_of('.')) +
+        ".txt";
+
+    // =================================================
+    // 保存图片
+    // =================================================
+
+    image_buffer_t buf;
+
+    memset(
+        &buf,
+        0,
+        sizeof(buf));
+
+    buf.width = image.cols;
+
+    buf.height = image.rows;
+
+    buf.format = IMAGE_FORMAT_RGB888;
+
+    buf.size =
+        image.total() *
+        image.elemSize();
+
+    buf.virt_addr =
+        (unsigned char *)image.data;
+
+    int ret =
+        write_image(
+            image_filename.c_str(),
+            &buf);
+
+    if (ret != 0)
+    {
+        std::cerr
+            << "[Debug] image save failed: "
+            << image_filename
+            << std::endl;
+
+        return;
+    }
+
+    // =================================================
+    // 打开 label 文件
+    // =================================================
+
+    std::ofstream ofs(label_filename);
+
+    if (!ofs.is_open())
+    {
+        std::cerr
+            << "[Debug] open label file failed: "
+            << label_filename
+            << std::endl;
+
+        return;
+    }
+
+    // =================================================
+    // 图像尺寸
+    // =================================================
+
+    const float img_w =
+        static_cast<float>(image.cols);
+
+    const float img_h =
+        static_cast<float>(image.rows);
+
+    // =================================================
+    // 写入每个 contour
+    // =================================================
+
+    for (size_t i = 0;
+         i < contours.size();
+         i++)
+    {
+        const auto &contour =
+            contours[i];
+
+        int cls_id =
+            cls_ids[i];
+
+        // 至少3个点
+        if (contour.size() < 3)
+        {
+            continue;
+        }
+
+        // class id
+        ofs << cls_id;
+
+        // polygon points
+        for (const auto &pt : contour)
+        {
+            float x =
+                static_cast<float>(pt.x) / img_w;
+
+            float y =
+                static_cast<float>(pt.y) / img_h;
+
+            // clamp
+            x = std::max(
+                0.0f,
+                std::min(1.0f, x));
+
+            y = std::max(
+                0.0f,
+                std::min(1.0f, y));
+
+            ofs << " "
+                << std::fixed
+                << std::setprecision(6)
+                << x
+                << " "
+                << y;
+        }
+
+        ofs << "\n";
+    }
+
+    ofs.close();
+
+    std::cout
+        << "[Debug] seg label saved: "
+        << label_filename
+        << std::endl;
+}

@@ -151,6 +151,10 @@ bool real_detect_infer(
         return false;
     }
 
+    // 数据回传时，调试信息里的mark轮廓和类别id也一并回传，主要用于分析空间位置符合条件时，检测结果的有效性，以及空间位置不符合条件时，是否存在高置信度的检测结果
+    std::vector<std::vector<cv::Point>> debug_all_contours;
+    std::vector<int> debug_all_cls_ids;
+
     // ========================================================
     // 统计
     // ========================================================
@@ -260,7 +264,7 @@ bool real_detect_infer(
 
         g_ctx.camera_params->ObjectboxToCameraXYZ(
             det,
-            contours_filtered);
+            contours_smoothed);
 
         // ====================================================
         // 填充结果
@@ -272,6 +276,13 @@ bool real_detect_infer(
             g_ctx.config);
 
         results.push_back(one);
+
+        // 写入调试信息里的mark轮廓和类别id，主要用于分析空间位置符合条件时，检测结果的有效性
+        for (const auto &contour : contours_smoothed)
+        {
+            debug_all_contours.push_back(contour);
+            debug_all_cls_ids.push_back(det->cls_id);
+        }
 
         // ====================================================
         // 尺寸计算
@@ -301,27 +312,55 @@ bool real_detect_infer(
                     "carpet_detect_exist_target_" +
                     std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
 
-                g_ctx.debuger->saveIfDetected(
-                    img,
-                    save_name); // 保存到存在目标的文件夹
+                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
+                // g_ctx.debuger->saveIfDetected(
+                //     img,
+                //     save_name);
+
+                if (!debug_all_contours.empty())
+                {
+                    g_ctx.debuger->saveSegLabel(
+                        img,
+                        debug_all_contours,
+                        debug_all_cls_ids,
+                        save_name);
+                }
             }
             else
             {
                 std::string save_name =
                     "carpet_detect_null_target_" +
                     std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
-                g_ctx.debuger->saveIfDetected(
-                    img,
-                    save_name); // 保存到不存在目标的文件夹
+                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
+                // g_ctx.debuger->saveIfDetected(
+                //     img,
+                //     save_name);
+
+                if (!debug_all_contours.empty())
+                {
+                    g_ctx.debuger->saveSegLabel(
+                        img,
+                        debug_all_contours,
+                        debug_all_cls_ids,
+                        save_name);
+                }
             }
         }
         else // 空间位置不符合条件
         {
             if (box_max_prop > g_ctx.config.debug_score_threshold) // 置信度符合,感兴趣阈值。则进行保存，主要用于分析空间位置不符合条件时，是否存在高置信度的检测结果
             {
-                g_ctx.debuger->saveIfDetected(
-                    img,
-                    "carpet_detect");
+                // g_ctx.debuger->saveIfDetected(
+                //     img,
+                //     "carpet_detect");
+                if (!debug_all_contours.empty())
+                {
+                    g_ctx.debuger->saveSegLabel(
+                        img,
+                        debug_all_contours,
+                        debug_all_cls_ids,
+                        "carpet_detect");
+                }
             }
         }
     }
