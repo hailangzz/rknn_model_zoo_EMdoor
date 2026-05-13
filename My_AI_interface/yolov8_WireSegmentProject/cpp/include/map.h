@@ -81,9 +81,9 @@ namespace visual_localization
 
     bool has_last_pose_ = false;
 
-    double min_save_distance_ = 0.5;
+    double min_save_distance_ = 0.2; // 单位：米，位置变化超过0.2米距离才考虑保存图像
 
-    double min_save_yaw_ = 0.3;
+    double min_save_yaw_ = 0.2; // 单位：弧度，yaw变化超过0.2弧度（约11.5度）才考虑保存图像
   };
 
 } // namespace visual_localization
