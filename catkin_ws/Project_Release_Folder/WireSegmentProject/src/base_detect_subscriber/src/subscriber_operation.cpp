@@ -5,101 +5,216 @@
 
 // 将xyz数据点，写入到本地文件中
 void appendCoordsToFile(
-    base_detect_msgs::ObjectCameraDetectResult& dst,
-    const std::string& file_path)
+    base_detect_msgs::ObjectCameraDetectResult &dst,
+    const std::string &file_path)
 {
     std::ofstream ofs(file_path, std::ios::out | std::ios::app);
-    if (!ofs.is_open()) {
+    if (!ofs.is_open())
+    {
         ROS_ERROR("Failed to open file: %s", file_path.c_str());
         return;
     }
 
     ofs << std::fixed << std::setprecision(6);
 
-    for (size_t i = 0; i < dst.coords.size(); ++i) {
+    for (size_t i = 0; i < dst.coords.size(); ++i)
+    {
         ofs << dst.coords[i].x << ","
             << dst.coords[i].y << ","
             << dst.coords[i].z;
 
-        if (i != dst.coords.size() - 1) {
+        if (i != dst.coords.size() - 1)
+        {
             ofs << " ";
         }
     }
 
-    ofs << "\n";  // 写完一次换一行
+    ofs << "\n"; // 写完一次换一行
     ofs.close();
 }
 
+BaseDetectNode::BaseDetectNode(ros::NodeHandle &nh)
+{
+    nh_ = nh;
+    has_new_frame_ = false;
+    running_ = true;
+    infer_enable_ = false; // 默认允许推理
 
-
-BaseDetectNode::BaseDetectNode(ros::NodeHandle& nh)        
+    /* 初始化模型 */
+    if (!base_model_init("./config/cfg.txt"))
     {
-      nh_ = nh;
-      has_new_frame_ = false;
-      running_ = true;
-      infer_enable_ = false;  // 默认允许推理
-
-      /* 初始化模型 */
-      if (!base_model_init("./config/cfg.txt"))
-      {
-          ROS_FATAL("Failed to init base model");
-          throw std::runtime_error("model init failed");
-      }
-
-      /* 订阅图像 */
-      image_sub_ = nh_.subscribe( image_sub_topic_, 1, &BaseDetectNode::imageCallback, this);
-
-      //  新增：发布检测结果
-      detect_result_pub_ = nh_.advertise<base_detect_msgs::ObjectCameraDetectResultArray>( detect_result_pub_topic_, 1);
-
-      // 新增：发布带检测框图像
-      debug_image_pub_ = nh_.advertise<sensor_msgs::Image>(debug_image_pub_topic_, 1);
-
-      /* 启动 ROS 参数监控线程 */
-      rosparam_monitor_thread_ = std::thread(&BaseDetectNode::rosparamMonitorLoop, this);
-
-      ROS_INFO("BaseDetectNode initialized");
+        ROS_FATAL("Failed to init base model");
+        throw std::runtime_error("model init failed");
     }
+
+    /* 订阅图像 */
+    image_sub_ = nh_.subscribe(image_sub_topic_, 1, &BaseDetectNode::imageCallback, this);
+    pose_sub_ = nh_.subscribe(pose_sub_topic_, 1, &BaseDetectNode::poseCallback, this);
+
+    //  新增：发布检测结果
+    detect_result_pub_ = nh_.advertise<base_detect_msgs::ObjectCameraDetectResultArray>(detect_result_pub_topic_, 1);
+
+    // 新增：发布带检测框图像
+    debug_image_pub_ = nh_.advertise<sensor_msgs::Image>(debug_image_pub_topic_, 1);
+
+    /* 启动 ROS 参数监控线程 */
+    rosparam_monitor_thread_ = std::thread(&BaseDetectNode::rosparamMonitorLoop, this);
+
+    ROS_INFO("BaseDetectNode initialized");
+}
 
 BaseDetectNode::~BaseDetectNode()
-    {
-        shutdown();
-    }
+{
+    shutdown();
+}
 
-void BaseDetectNode::create_infer_thread(){
-  try
-      {
-    /* 启动推理线程 */
-      infer_thread_ = std::thread(&BaseDetectNode::inferenceLoop, this);
-      }
-  catch (const cv_bridge::Exception& e)
+void BaseDetectNode::create_infer_thread()
+{
+    try
     {
-      ROS_ERROR("infer_thread_ exception: %s", e.what());
+        /* 启动推理线程 */
+        infer_thread_ = std::thread(&BaseDetectNode::inferenceLoop, this);
+    }
+    catch (const cv_bridge::Exception &e)
+    {
+        ROS_ERROR("infer_thread_ exception: %s", e.what());
     }
 }
 
-void BaseDetectNode::imageCallback(const sensor_msgs::ImageConstPtr& msg)
+void BaseDetectNode::imageCallback(const sensor_msgs::ImageConstPtr &msg)
+{
+    try
     {
-        try
-        {
-            cv::Mat img = cv_bridge::toCvShare(msg, "rgb8")->image;
+        cv::Mat img = cv_bridge::toCvShare(msg, "rgb8")->image;
 
-            {
-                std::lock_guard<std::mutex> lock(frame_mutex_);
-                latest_frame_ = img.clone();
-                has_new_frame_ = true;
-            }
-
-            frame_cv_.notify_one();
-        }
-        catch (const cv_bridge::Exception& e)
         {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
+            std::lock_guard<std::mutex> lock(frame_mutex_);
+            latest_frame_ = img.clone();
+            has_new_frame_ = true;
         }
+
+        frame_cv_.notify_one();
     }
+    catch (const cv_bridge::Exception &e)
+    {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+    }
+}
 
+void BaseDetectNode::poseCallback(
+    const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg)
+{
+    std::lock_guard<std::mutex> lock(pose_mutex_);
 
-    /* ============ 推理主循环 ============ */
+    latest_pose_ = *msg; // ✅ 正确写法（关键修复）
+    has_pose_ = true;
+
+    ROS_DEBUG("Pose: x=%.3f y=%.3f z=%.3f",
+              latest_pose_.pose.pose.position.x,
+              latest_pose_.pose.pose.position.y,
+              latest_pose_.pose.pose.position.z);
+}
+
+/* ============ 推理主循环 ============ */
+// void BaseDetectNode::inferenceLoop()
+// {
+//     // ROS_INFO("YOLOv8 inference thread started");
+
+//     while (ros::ok() && running_)
+//     {
+
+//         cv::Mat img;
+
+//         /* ---------- 等待新帧 ---------- */
+//         {
+//             std::unique_lock<std::mutex> lock(frame_mutex_);
+//             frame_cv_.wait(lock, [this]
+//                            { return (has_new_frame_ && infer_enable_) || !running_ || !ros::ok(); });
+
+//             if (!running_ || !ros::ok())
+//                 break;
+
+//             img = latest_frame_.clone();
+//             has_new_frame_ = false;
+//         }
+
+//         /* ---------- 推理 ---------- */
+//         // ROS_DEBUG("base_detect_infer begin");
+//         // base_detect_infer(img, camera_coordinates_results_);
+//         if (!base_detect_infer(img, camera_coordinates_results_))
+//         {
+//             ROS_DEBUG("No valid object detected, skip publish");
+//             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//             continue;
+//         }
+
+//         ROS_DEBUG("base_detect_infer finished");
+
+//         /* =====================================================
+//          * 新增：打印 latest_pose_
+//          * ===================================================== */
+//         {
+//             std::lock_guard<std::mutex> lock(pose_mutex_);
+
+//             if (has_pose_)
+//             {
+//                 ROS_INFO(
+//                     "Robot Pose:\n"
+//                     "position: [%.3f, %.3f, %.3f]\n"
+//                     "orientation: [%.3f, %.3f, %.3f, %.3f]",
+//                     latest_pose_.pose.position.x,
+//                     latest_pose_.pose.position.y,
+//                     latest_pose_.pose.position.z,
+//                     latest_pose_.pose.orientation.x,
+//                     latest_pose_.pose.orientation.y,
+//                     latest_pose_.pose.orientation.z,
+//                     latest_pose_.pose.orientation.w);
+//             }
+//             else
+//             {
+//                 ROS_WARN("No pose received yet.");
+//             }
+//         }
+
+//         /* ---------- 构造 ROS 消息 ---------- */
+//         base_detect_msgs::ObjectCameraDetectResultArray msg;
+//         msg.header.stamp = ros::Time::now();
+//         msg.header.frame_id = camera_coordinate_system_flag_; // 很重要
+
+//         for (const auto &r : camera_coordinates_results_)
+//         {
+//             // ROS_INFO(
+//             //     "Detect object: cls_id=%d, prop=%.3f, "
+//             //     "LT(%.2f, %.2f, %.2f), RT(%.2f, %.2f, %.2f), "
+//             //     "RB(%.2f, %.2f, %.2f), LB(%.2f, %.2f, %.2f)",
+//             //     r.cls_id, r.prop,
+//             //     r.coords[0].X, r.coords[0].Y, r.coords[0].Z,
+//             //     r.coords[1].X, r.coords[1].Y, r.coords[1].Z,
+//             //     r.coords[2].X, r.coords[2].Y, r.coords[2].Z,
+//             //     r.coords[3].X, r.coords[3].Y, r.coords[3].Z
+//             // );
+
+//             // for (int i = 0; i < 20; ++i) {
+//             //     auto& p = r.add_edge_point_single_pixel_camera_coordinates[i];
+//             //     ROS_INFO(" dst : [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
+//             // }
+
+//             base_detect_msgs::ObjectCameraDetectResult one;
+//             convertToMsg(r, one);
+//             msg.results.push_back(one);
+//         }
+
+//         /* ---------- 发布 ---------- */
+//         detect_result_pub_.publish(msg);
+//         ROS_DEBUG("detect_result_pub_ published, size=%zu", msg.results.size());
+
+//         // 发布绘图结果
+//         publishDebugImage(img, camera_coordinates_results_, msg.header);
+//     }
+
+//     // ROS_INFO("YOLOv8 inference thread exited");
+// }
+
 void BaseDetectNode::inferenceLoop()
 {
     // ROS_INFO("YOLOv8 inference thread started");
@@ -108,13 +223,13 @@ void BaseDetectNode::inferenceLoop()
     {
 
         cv::Mat img;
+        geometry_msgs::PoseWithCovarianceStamped current_pose;
 
         /* ---------- 等待新帧 ---------- */
         {
             std::unique_lock<std::mutex> lock(frame_mutex_);
-            frame_cv_.wait(lock, [this] {
-                return (has_new_frame_ && infer_enable_) || !running_ || !ros::ok();
-            });
+            frame_cv_.wait(lock, [this]
+                           { return (has_new_frame_ && infer_enable_) || !running_ || !ros::ok(); });
 
             if (!running_ || !ros::ok())
                 break;
@@ -123,46 +238,88 @@ void BaseDetectNode::inferenceLoop()
             has_new_frame_ = false;
         }
 
+        /* =====================================================
+         * 获取 pose
+         * ===================================================== */
+        {
+            std::lock_guard<std::mutex> lock(pose_mutex_);
+
+            if (!has_pose_)
+            {
+                ROS_WARN("No pose received yet.");
+                continue;
+            }
+
+            current_pose = latest_pose_;
+        }
+
+        /* =====================================================
+         * geometry_msgs -> Eigen
+         * ===================================================== */
+
+        Eigen::Vector3d position(
+            current_pose.pose.pose.position.x,
+            current_pose.pose.pose.position.y,
+            current_pose.pose.pose.position.z);
+
+        Eigen::Quaterniond q(
+            current_pose.pose.pose.orientation.w,
+            current_pose.pose.pose.orientation.x,
+            current_pose.pose.pose.orientation.y,
+            current_pose.pose.pose.orientation.z);
+
+        camera_coordinates_results_.clear();
+
         /* ---------- 推理 ---------- */
         // ROS_DEBUG("base_detect_infer begin");
         // base_detect_infer(img, camera_coordinates_results_);
-        if (!base_detect_infer(img, camera_coordinates_results_))
-            {
-                ROS_DEBUG("No valid object detected, skip publish");
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
+        if (!base_detect_infer(img, camera_coordinates_results_, position, q))
+        {
+            ROS_DEBUG("No valid object detected, skip publish");
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
+        /* =====================================================
+         * 无有效结果
+         * ===================================================== */
+
+        if (camera_coordinates_results_.empty())
+        {
+            ROS_DEBUG("camera_coordinates_results_ empty");
+
+            continue;
+        }
 
         ROS_DEBUG("base_detect_infer finished");
 
         /* ---------- 构造 ROS 消息 ---------- */
         base_detect_msgs::ObjectCameraDetectResultArray msg;
         msg.header.stamp = ros::Time::now();
-        msg.header.frame_id = camera_coordinate_system_flag_;   // 很重要
+        msg.header.frame_id = camera_coordinate_system_flag_; // 很重要
 
-        for (const auto& r : camera_coordinates_results_)
-            {
-                // ROS_INFO(
-                //     "Detect object: cls_id=%d, prop=%.3f, "
-                //     "LT(%.2f, %.2f, %.2f), RT(%.2f, %.2f, %.2f), "
-                //     "RB(%.2f, %.2f, %.2f), LB(%.2f, %.2f, %.2f)",
-                //     r.cls_id, r.prop,
-                //     r.coords[0].X, r.coords[0].Y, r.coords[0].Z,
-                //     r.coords[1].X, r.coords[1].Y, r.coords[1].Z,
-                //     r.coords[2].X, r.coords[2].Y, r.coords[2].Z,
-                //     r.coords[3].X, r.coords[3].Y, r.coords[3].Z
-                // );
+        for (const auto &r : camera_coordinates_results_)
+        {
+            // ROS_INFO(
+            //     "Detect object: cls_id=%d, prop=%.3f, "
+            //     "LT(%.2f, %.2f, %.2f), RT(%.2f, %.2f, %.2f), "
+            //     "RB(%.2f, %.2f, %.2f), LB(%.2f, %.2f, %.2f)",
+            //     r.cls_id, r.prop,
+            //     r.coords[0].X, r.coords[0].Y, r.coords[0].Z,
+            //     r.coords[1].X, r.coords[1].Y, r.coords[1].Z,
+            //     r.coords[2].X, r.coords[2].Y, r.coords[2].Z,
+            //     r.coords[3].X, r.coords[3].Y, r.coords[3].Z
+            // );
 
+            // for (int i = 0; i < 20; ++i) {
+            //     auto& p = r.add_edge_point_single_pixel_camera_coordinates[i];
+            //     ROS_INFO(" dst : [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
+            // }
 
-                // for (int i = 0; i < 20; ++i) {
-                //     auto& p = r.add_edge_point_single_pixel_camera_coordinates[i];
-                //     ROS_INFO(" dst : [%2d] X=%.3f, Y=%.3f, Z=%.3f\n", i, p.X, p.Y, p.Z);
-                // }
-
-                base_detect_msgs::ObjectCameraDetectResult one;
-                convertToMsg(r, one);
-                msg.results.push_back(one);
-            }
+            base_detect_msgs::ObjectCameraDetectResult one;
+            convertToMsg(r, one);
+            msg.results.push_back(one);
+        }
 
         /* ---------- 发布 ---------- */
         detect_result_pub_.publish(msg);
@@ -175,7 +332,7 @@ void BaseDetectNode::inferenceLoop()
     // ROS_INFO("YOLOv8 inference thread exited");
 }
 
-    /* ============ 资源释放 ============ */
+/* ============ 资源释放 ============ */
 void BaseDetectNode::shutdown()
 {
     if (!running_)
@@ -186,7 +343,7 @@ void BaseDetectNode::shutdown()
 
     if (infer_thread_.joinable())
         infer_thread_.join();
-    
+
     if (rosparam_monitor_thread_.joinable())
         rosparam_monitor_thread_.join();
 
@@ -195,7 +352,7 @@ void BaseDetectNode::shutdown()
     ROS_INFO("BaseDetectNode shutdown complete");
 }
 
-void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<ObjectCameraDetectResult>& results,const std_msgs::Header& header)
+void BaseDetectNode::publishDebugImage(const cv::Mat &img, const std::vector<ObjectCameraDetectResult> &results, const std_msgs::Header &header)
 {
     if (img.empty())
         return;
@@ -203,17 +360,17 @@ void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Obje
     // 一定要 clone，不能修改原图
     cv::Mat debug_img = img.clone();
 
-    for (const auto& r : results)
+    for (const auto &r : results)
     {
         // ================================
         // 1. 使用像素坐标画框（关键修正点）
         // ================================
-        const ObjectTargetBox& box = r.target_box;
+        const ObjectTargetBox &box = r.target_box;
 
         // 合法性保护（防止越界）
-        int left   = std::max(0, box.left);
-        int top    = std::max(0, box.top);
-        int right  = std::min(box.right,  img.cols - 1);
+        int left = std::max(0, box.left);
+        int top = std::max(0, box.top);
+        int right = std::min(box.right, img.cols - 1);
         int bottom = std::min(box.bottom, img.rows - 1);
 
         cv::Point pt1(left, top);
@@ -223,16 +380,16 @@ void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Obje
             debug_img,
             pt1,
             pt2,
-            cv::Scalar(0, 255, 0),  // 绿色框
-            2
-        );
+            cv::Scalar(0, 255, 0), // 绿色框
+            2);
 
         // ================================
         // 【新增】1.1 绘制 mark 轮廓区域
         // ================================
-        for (const auto& contour : r.object_contours_mark_point)
+        for (const auto &contour : r.object_contours_mark_point)
         {
-            if (contour.empty()) continue;
+            if (contour.empty())
+                continue;
 
             std::vector<std::vector<cv::Point>> draw_contours;
             draw_contours.push_back(contour);
@@ -241,9 +398,8 @@ void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Obje
                 debug_img,
                 draw_contours,
                 -1,
-                cv::Scalar(0, 0, 255),  // 红色轮廓
-                2
-            );
+                cv::Scalar(0, 0, 255), // 红色轮廓
+                2);
         }
 
         // ================================
@@ -260,8 +416,7 @@ void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Obje
             cv::FONT_HERSHEY_SIMPLEX,
             0.5,
             cv::Scalar(0, 255, 0),
-            1
-        );
+            1);
     }
 
     // ================================
@@ -273,10 +428,9 @@ void BaseDetectNode::publishDebugImage(const cv::Mat& img,const std::vector<Obje
     debug_image_pub_.publish(img_msg);
 }
 
-
 void BaseDetectNode::convertToMsg(
-    const ObjectCameraDetectResult& src,
-    base_detect_msgs::ObjectCameraDetectResult& dst)
+    const ObjectCameraDetectResult &src,
+    base_detect_msgs::ObjectCameraDetectResult &dst)
 {
     dst.prop = src.prop;
     dst.cls_id = src.cls_id;
@@ -293,7 +447,8 @@ void BaseDetectNode::convertToMsg(
     // }
 
     // 2️⃣ 再写边缘点
-    for (const auto& c : src.add_edge_point_single_pixel_camera_coordinates) {
+    for (const auto &c : src.add_edge_point_single_pixel_camera_coordinates)
+    {
         base_detect_msgs::CameraCoordinate pt;
         pt.x = c.X;
         pt.y = c.Y;
@@ -304,11 +459,10 @@ void BaseDetectNode::convertToMsg(
     // ✅ dst.coords 顺序为：角点[0~3] + 边缘点[0~N]，不假设固定长度
 }
 
-
 /* ============ ROS 参数监控线程 ============ */
 void BaseDetectNode::rosparamMonitorLoop()
 {
-    ros::Rate rate(1.0);  // 每秒读取一次
+    ros::Rate rate(1.0); // 每秒读取一次
     while (ros::ok() && running_)
     {
         bool param_val = false;

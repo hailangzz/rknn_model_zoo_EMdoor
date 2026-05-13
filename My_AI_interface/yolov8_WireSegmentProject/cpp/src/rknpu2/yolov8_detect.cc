@@ -50,6 +50,12 @@ ConfigInfo readConfig(const std::string& filename) {
     cfg_values.camera_D_6 = std::stof(config["camera_D_6"]);
     cfg_values.camera_D_7 = std::stof(config["camera_D_7"]);
 
+    cfg_values.debug_score_threshold = std::stof(config["debug_score_threshold"]);
+    cfg_values.save_debug_images_path = config["save_debug_images_path"];
+    cfg_values.save_images_path_spatial_location_val = config["save_images_path_spatial_location_val"];
+    cfg_values.is_save_debug_images = (config["is_save_debug_images"] == "true");
+    cfg_values.fps_limit = std::stoi(config["fps_limit"]);
+
     return cfg_values;
 }
 

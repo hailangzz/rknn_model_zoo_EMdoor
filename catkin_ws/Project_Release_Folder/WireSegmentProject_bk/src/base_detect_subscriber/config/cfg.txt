@@ -36,11 +36,3 @@ camera_D_4=0.003289
 camera_D_5=1.455798
 camera_D_6=0.474246
 camera_D_7=0.024653
-
-//debug配置管理
-debug_score_threshold=0.3f
-//save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/WireSegmentProject/images
-save_debug_images_path=/home/robot/share/AI_Program/WireSegmentProject/images
-save_images_path_spatial_location_val=/home/robot/share/AI_Program/WireSegmentProject/spatial_location_val_images
-is_save_debug_images=true
-fps_limit=5

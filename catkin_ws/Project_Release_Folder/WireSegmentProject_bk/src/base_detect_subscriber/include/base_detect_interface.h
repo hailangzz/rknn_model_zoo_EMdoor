@@ -2,15 +2,11 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <vector>
-
-/* ================= box ================= */
-
-typedef struct
-{
+typedef struct {
     int left;
     int top;
     int right;
@@ -35,25 +31,11 @@ typedef struct {
 
 } ObjectCameraDetectResult;
 
-/* ================= 初始化 ================= */
 
-bool base_model_init(
-    const char *config_path);
-
-/* ================= 普通推理 ================= */
-
-bool real_detect_infer(
-    const cv::Mat &img,
-    std::vector<ObjectCameraDetectResult> &results);
-
-/* ================= 带位姿采样推理 ================= */
-
-bool base_detect_infer(
-    const cv::Mat &img,
-    std::vector<ObjectCameraDetectResult> &results,
-    const Eigen::Vector3d &position,
-    const Eigen::Quaterniond &q);
-
-/* ================= 释放 ================= */
-
+bool base_model_init(const char* config_path);
+bool base_detect_infer(const cv::Mat& img,std::vector<ObjectCameraDetectResult>& results);
 void base_model_release();
+
+#ifdef __cplusplus
+}
+#endif

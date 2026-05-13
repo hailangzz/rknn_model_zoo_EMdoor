@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 # OpenCV（cv_bridge 依赖）
 find_package(OpenCV REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 # ------------------------------------------------
 # catkin package 声明
@@ -35,7 +34,6 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
 )
 
 # ------------------------------------------------
@@ -62,7 +60,6 @@ target_link_libraries(main_base_detect_subscriber_node
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/librknn_wire_detect.so
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/librknnrt.so
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/librga.so
-  ${EIGEN3_LIBRARIES}
 )
 
 # ------------------------------------------------

@@ -31,6 +31,9 @@ endif()
 
 find_package(OpenCV REQUIRED)
 
+find_package(Eigen3 REQUIRED)
+
+
 message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
 
@@ -67,6 +70,8 @@ add_executable(${PROJECT_NAME}
     src/postprocess.cc
     src/transform_coordinates.cc
     src/base_detect_interface.cc
+    src/debug.cc
+    src/map.cc
     ${rknpu_yolov8_file}
 )
 
@@ -76,6 +81,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/timer
     ${LIBRKNNRT_INCLUDES}
     ${OpenCV_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -107,6 +113,8 @@ add_library(rknn_wire_detect SHARED
     src/base_detect_interface.cc
     src/postprocess.cc
     src/transform_coordinates.cc
+    src/debug.cc
+    src/map.cc
     ${rknpu_yolov8_file}
 )
 
@@ -116,6 +124,7 @@ target_include_directories(rknn_wire_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/timer
     ${LIBRKNNRT_INCLUDES}
     ${OpenCV_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIRS}
 )
 
 target_link_libraries(rknn_wire_detect

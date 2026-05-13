@@ -10,7 +10,6 @@
 #include "base_detect_interface.h"
 #include <base_detect_msgs/ObjectCameraDetectResultArray.h>
 
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 class BaseDetectNode
 {
@@ -21,10 +20,10 @@ public:
     void create_infer_thread();
 
 private:
-    /* ============ ROS 回调 ============ */
-    void imageCallback(const sensor_msgs::ImageConstPtr &msg);
-    void poseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
 
+    /* ============ ROS 回调 ============ */
+    void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+    
     /* ============ 推理主循环 ============ */
     void inferenceLoop();    
 
@@ -40,10 +39,7 @@ private:
     /* ============ ROS ============ */
     ros::NodeHandle nh_;
     ros::Subscriber image_sub_;
-    ros::Subscriber pose_sub_;
-
-    const std::string image_sub_topic_ = "camera/color/image_raw";
-    const std::string pose_sub_topic_ = "/pose_with_cov";
+    const std::string image_sub_topic_= "camera/color/image_raw";
 
     /* ============ 推理线程 ============ */
     std::thread infer_thread_;
@@ -76,8 +72,5 @@ private:
     // ros下坐标系标志
     const std::string camera_coordinate_system_flag_= "color_camera_optical_link";
 
-    /* ============ Pose缓存（关键修复） ============ */
-    geometry_msgs::PoseWithCovarianceStamped latest_pose_;
-    std::mutex pose_mutex_;
-    bool has_pose_;
 };
+
