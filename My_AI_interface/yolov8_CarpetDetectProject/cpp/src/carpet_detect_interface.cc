@@ -9,8 +9,6 @@
 // carpet_detect_interface.cpp
 static DetectContext g_ctx;
 
-
-
 inline float estimateDistance(float x)
 {
     float polyfit_result;
@@ -20,9 +18,10 @@ inline float estimateDistance(float x)
     return polyfit_result;
 }
 
-bool carpet_model_init(const char* config_path)
+bool carpet_model_init(const char *config_path)
 {
-    if (g_ctx.initialized) {
+    if (g_ctx.initialized)
+    {
         printf("carpet model already initialized");
         return true;
     }
@@ -32,7 +31,7 @@ bool carpet_model_init(const char* config_path)
 
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
-    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path,g_ctx.config.is_save_debug_images,g_ctx.config.fps_limit);
+    g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path, g_ctx.config.is_save_debug_images, g_ctx.config.fps_limit);
 
     g_ctx.initialized = true;
 
@@ -41,231 +40,265 @@ bool carpet_model_init(const char* config_path)
 }
 
 // ================= 保存结果图像 =================
-static int save_index = 0;   // 静态自增计数器
+static int save_index = 0; // 静态自增计数器
 
-const char* save_dir = "./result_images";
+const char *save_dir = "./result_images";
 
-bool carpet_detect_infer(const cv::Mat& img, std::vector<ObjectCameraDetectResult>& results)
+bool carpet_detect_infer(const cv::Mat &img,
+                         std::vector<ObjectCameraDetectResult> &results)
 {
     results.clear();
 
-    if (!g_ctx.initialized || img.empty()) {
-        printf("model not initialized or empty image\n");
+    // ================= 基础检查 =================
+    if (!g_ctx.initialized)
+    {
+        printf("[ERROR] model not initialized\n");
         return false;
     }
 
-    cv::Mat img_rgb;
-
-    // 如果原图是 4 通道 RGBA，转换为 RGB
-    if (img.channels() == 4) {
-        cv::cvtColor(img, img_rgb, cv::COLOR_RGBA2RGB);
-    } else if (img.channels() == 1) {
-        cv::cvtColor(img, img_rgb, cv::COLOR_GRAY2RGB);
-    } else {
-        img_rgb = img;
+    if (img.empty() || img.data == nullptr)
+    {
+        printf("[ERROR] input image empty\n");
+        return false;
     }
 
+    printf("\n========== carpet_detect_infer ==========\n");
+    printf("input image: w=%d h=%d c=%d\n",
+           img.cols,
+           img.rows,
+           img.channels());
+
+    printf("input image data ptr: %p\n", img.data);
+
+    // ================= 深拷贝，避免多线程 Mat 野指针 =================
+    cv::Mat safe_img = img.clone();
+
+    if (safe_img.empty() || safe_img.data == nullptr)
+    {
+        printf("[ERROR] safe_img clone failed\n");
+        return false;
+    }
+
+    // ================= 转 RGB =================
+    cv::Mat img_rgb;
+
+    if (safe_img.channels() == 4)
+    {
+        cv::cvtColor(safe_img, img_rgb, cv::COLOR_RGBA2RGB);
+    }
+    else if (safe_img.channels() == 1)
+    {
+        cv::cvtColor(safe_img, img_rgb, cv::COLOR_GRAY2RGB);
+    }
+    else if (safe_img.channels() == 3)
+    {
+        // 深拷贝
+        img_rgb = safe_img.clone();
+    }
+    else
+    {
+        printf("[ERROR] unsupported image channels: %d\n",
+               safe_img.channels());
+        return false;
+    }
+
+    // ================= 检查 RGB 图像 =================
+    if (img_rgb.empty() || img_rgb.data == nullptr)
+    {
+        printf("[ERROR] img_rgb invalid\n");
+        return false;
+    }
+
+    // ================= 保证连续内存 =================
+    if (!img_rgb.isContinuous())
+    {
+        printf("[WARN] img_rgb not continuous, clone again\n");
+        img_rgb = img_rgb.clone();
+    }
+
+    if (!img_rgb.isContinuous())
+    {
+        printf("[ERROR] img_rgb still not continuous\n");
+        return false;
+    }
+
+    printf("rgb image: w=%d h=%d c=%d\n",
+           img_rgb.cols,
+           img_rgb.rows,
+           img_rgb.channels());
+
+    printf("rgb image ptr: %p\n", img_rgb.data);
+
+    // ================= 构建 RKNN 输入 =================
     image_buffer_t src_image;
     memset(&src_image, 0, sizeof(image_buffer_t));
 
-    size_t buffer_size = img_rgb.total() * img_rgb.elemSize();
+    size_t buffer_size =
+        img_rgb.cols *
+        img_rgb.rows *
+        img_rgb.channels();
 
-    // 使用 posix_memalign 分配对齐内存，避免 RGA 偶发日志
-    if (posix_memalign((void**)&src_image.virt_addr, 64, buffer_size) != 0) {
-        printf("failed to allocate aligned memory\n");
+    printf("buffer_size=%zu\n", buffer_size);
+
+    // 64 字节对齐
+    if (posix_memalign((void **)&src_image.virt_addr,
+                       64,
+                       buffer_size) != 0)
+    {
+        printf("[ERROR] posix_memalign failed\n");
         return false;
     }
 
-    // 初始化缓冲区
+    if (src_image.virt_addr == nullptr)
+    {
+        printf("[ERROR] aligned memory null\n");
+        return false;
+    }
+
     memset(src_image.virt_addr, 0, buffer_size);
 
-    // 拷贝图像数据
-    memcpy(src_image.virt_addr, img_rgb.data, buffer_size);
+    // ================= 拷贝图像数据 =================
+    memcpy(src_image.virt_addr,
+           img_rgb.data,
+           buffer_size);
 
-    src_image.width  = img_rgb.cols;
+    src_image.width = img_rgb.cols;
     src_image.height = img_rgb.rows;
-    src_image.format = IMAGE_FORMAT_RGB888; // 确保 RGA / NPU 支持
-    src_image.size   = buffer_size;
+    src_image.format = IMAGE_FORMAT_RGB888;
+    src_image.size = buffer_size;
 
+    // ================= 推理 =================
     object_detect_result_list od_results;
+    memset(&od_results, 0, sizeof(object_detect_result_list));
 
-    // YOLOv8 推理
-    int ret = g_ctx.detector->inference_yolov8_model(&src_image, &od_results);
-    if (ret != 0) {
-        printf("yolov8 inference failed\n");
+    printf("start inference...\n");
+
+    int ret =
+        g_ctx.detector->inference_yolov8_model(
+            &src_image,
+            &od_results);
+
+    if (ret != 0)
+    {
+        printf("[ERROR] yolov8 inference failed ret=%d\n", ret);
+
         free(src_image.virt_addr);
+        src_image.virt_addr = nullptr;
+
         return false;
     }
 
-    // ================= 统计 =================
-    float box_max_prop = std::numeric_limits<float>::lowest();
-    // 遍历检测结果
-    for (int i = 0; i < od_results.count; i++) {
-        object_detect_result* det = &od_results.results[i];
+    printf("inference success, detect count=%d\n",
+           od_results.count);
+
+    // ================= 后处理 =================
+    float box_max_prop = 0.f;
+
+    for (int i = 0; i < od_results.count; i++)
+    {
+        object_detect_result *det = &od_results.results[i];
+
         ObjectCameraDetectResult one;
 
-        // ---------- 最大置信度 ----------
-        box_max_prop = std::max(box_max_prop, det->prop);
+        box_max_prop =
+            std::max(box_max_prop, det->prop);
 
-        // 坐标转换 （转换为，原始未矫正的，xyz尺寸值）
-        g_ctx.camera_params->ObjectboxToCameraXYZ(det->box, det->camera_coordinates);
+        // 坐标转换
+        g_ctx.camera_params->ObjectboxToCameraXYZ(
+            det->box,
+            det->camera_coordinates);
 
-        one.prop   = det->prop;
-        // one.cls_id = det->cls_id;   //模型输出的目标类别
-        one.cls_id = g_ctx.config.CARPET_AREA;               // 同建图同事，确认的地毯区域目标ID，用于定义建图时的重要程度
+        one.prop = det->prop;
 
-        one.coords[0].X = det->camera_coordinates.left_top.X;
-        one.coords[0].Y = det->camera_coordinates.left_top.Y;
-        // one.coords[0].Z = det->camera_coordinates.left_top.Z;
-        // one.coords[0].Z = det->camera_coordinates.left_top.Z*g_ctx.config.camera_z_axle_top_resize_rate;
-        one.coords[0].Z = estimateDistance(det->camera_coordinates.left_top.Z);
+        one.cls_id = g_ctx.config.CARPET_AREA;
 
-        one.coords[1].X = det->camera_coordinates.right_top.X;
-        one.coords[1].Y = det->camera_coordinates.right_top.Y;
-        // one.coords[1].Z = det->camera_coordinates.right_top.Z;
-        // one.coords[1].Z = det->camera_coordinates.right_top.Z*g_ctx.config.camera_z_axle_top_resize_rate;
-        one.coords[1].Z = estimateDistance(det->camera_coordinates.right_top.Z);
+        // 四点坐标
+        one.coords[0].X =
+            det->camera_coordinates.left_top.X;
+        one.coords[0].Y =
+            det->camera_coordinates.left_top.Y;
+        one.coords[0].Z =
+            estimateDistance(
+                det->camera_coordinates.left_top.Z);
 
-        one.coords[2].X = det->camera_coordinates.right_bottom.X;
-        one.coords[2].Y = det->camera_coordinates.right_bottom.Y;
-        // one.coords[2].Z = det->camera_coordinates.right_bottom.Z;
-        one.coords[2].Z = estimateDistance(det->camera_coordinates.right_bottom.Z);
+        one.coords[1].X =
+            det->camera_coordinates.right_top.X;
+        one.coords[1].Y =
+            det->camera_coordinates.right_top.Y;
+        one.coords[1].Z =
+            estimateDistance(
+                det->camera_coordinates.right_top.Z);
 
-        one.coords[3].X = det->camera_coordinates.left_bottom.X;
-        one.coords[3].Y = det->camera_coordinates.left_bottom.Y;
-        // one.coords[3].Z = det->camera_coordinates.left_bottom.Z;
-        one.coords[3].Z = estimateDistance(det->camera_coordinates.left_bottom.Z);
+        one.coords[2].X =
+            det->camera_coordinates.right_bottom.X;
+        one.coords[2].Y =
+            det->camera_coordinates.right_bottom.Y;
+        one.coords[2].Z =
+            estimateDistance(
+                det->camera_coordinates.right_bottom.Z);
 
-        one.target_box.top    = det->box.top;
+        one.coords[3].X =
+            det->camera_coordinates.left_bottom.X;
+        one.coords[3].Y =
+            det->camera_coordinates.left_bottom.Y;
+        one.coords[3].Z =
+            estimateDistance(
+                det->camera_coordinates.left_bottom.Z);
+
+        // box
+        one.target_box.top = det->box.top;
         one.target_box.bottom = det->box.bottom;
-        one.target_box.left   = det->box.left;
-        one.target_box.right  = det->box.right;
+        one.target_box.left = det->box.left;
+        one.target_box.right = det->box.right;
 
-        // ===== 新增：edge 目标框，边界线处 采样点 =====
-        
-        for (int index = 0; index < 20; ++index) {
-            const auto& src = det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[index];
+        // edge points
+        const int src_edge_point_num =
+            sizeof(det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates) / sizeof(det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[0]);
 
-            single_pixel_camera_coordinates dst = src;
-            dst.Z = estimateDistance(src.Z);
+        const int dst_edge_point_num =
+            sizeof(one.add_edge_point_single_pixel_camera_coordinates) / sizeof(one.add_edge_point_single_pixel_camera_coordinates[0]);
 
-            // 正确赋值
-            one.add_edge_point_single_pixel_camera_coordinates[index].X = dst.X;
-            one.add_edge_point_single_pixel_camera_coordinates[index].Y = dst.Y;
-            one.add_edge_point_single_pixel_camera_coordinates[index].Z = dst.Z;
+        const int edge_point_num =
+            std::min(src_edge_point_num, dst_edge_point_num);
 
-            // printf("det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates x:%.3f m, y:=%.3f m, z:=%.3f m\n", dst.X, dst.Y,dst.Z);
+        for (int index = 0; index < edge_point_num; ++index)
+        {
+            const auto &src =
+                det->camera_coordinates
+                    .add_edge_point_single_pixel_camera_coordinates[index];
 
+            one.add_edge_point_single_pixel_camera_coordinates[index].X =
+                src.X;
+
+            one.add_edge_point_single_pixel_camera_coordinates[index].Y =
+                src.Y;
+
+            one.add_edge_point_single_pixel_camera_coordinates[index].Z =
+                estimateDistance(src.Z);
         }
 
-        
-        results.push_back(one); 
-
-        ObjectSize3D size;
-        if (calcObjectSizeByAverage(one, size)) {
-            // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
-        }
+        results.push_back(one);
     }
 
     // ================= Debug 保存 =================
-    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold) {
-        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
+    if (g_ctx.debuger &&
+        box_max_prop > g_ctx.config.debug_score_threshold)
+    {
+        printf("save debug image\n");
+
+        g_ctx.debuger->saveIfDetected(
+            safe_img,
+            "carpet_detect");
     }
 
-    // // 调试输出
-    // for (int i = 0; i < od_results.count; i++) {
-    //     auto& det = results[i];
-    //     printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
-    // }
-
+    // ================= 释放 =================
     free(src_image.virt_addr);
+    src_image.virt_addr = nullptr;
 
+    printf("========== infer finished ==========\n\n");
 
     return !results.empty();
 }
-
-
-
-// bool carpet_detect_infer(const cv::Mat& img)
-// {
-//     if (!g_ctx.initialized || img.empty()) {
-//         printf("model not initialized or empty image\n");
-//         return false;
-//     }
-
-//     // 确保图像连续存储
-//     cv::Mat input_img = img.isContinuous() ? img : img.clone();
-
-//     // OpenCV 默认 BGR，YOLOv8 model 需要 RGB
-//     cv::Mat img_rgb;
-//     cv::cvtColor(input_img, img_rgb, cv::COLOR_BGR2RGB);
-
-//     // 准备 image_buffer_t
-//     image_buffer_t src_image;
-//     memset(&src_image, 0, sizeof(image_buffer_t));
-//     size_t img_size = img_rgb.total() * img_rgb.elemSize();
-//     src_image.virt_addr = (unsigned char*)malloc(img_size);
-//     if (!src_image.virt_addr) {
-//         printf("malloc failed\n");
-//         return false;
-//     }
-//     memcpy(src_image.virt_addr, img_rgb.data, img_size);
-
-//     src_image.width  = img_rgb.cols;
-//     src_image.height = img_rgb.rows;
-//     src_image.format = IMAGE_FORMAT_RGB888;
-//     src_image.size   = img_size;
-
-//     // YOLOv8 推理
-//     object_detect_result_list od_results;
-//     int ret = g_ctx.detector->inference_yolov8_model(&src_image, &od_results);
-//     if (ret != 0) {
-//         printf("yolov8 inference failed\n");
-//         free(src_image.virt_addr);
-//         return false;
-//     }
-
-//     // 可选：坐标转换
-//     for (int i = 0; i < od_results.count; i++) {
-//         auto& det = od_results.results[i];
-//         g_ctx.camera_params->ObjectboxToCameraXYZ(det.box, det.camera_coordinates);
-//     }
-
-//     // 绘制检测框和文字
-//     char text[256];
-//     for (int i = 0; i < od_results.count; i++) {
-//         object_detect_result *det_result = &(od_results.results[i]);
-//         printf("%s @ (%d %d %d %d) %.3f\n",
-//                coco_cls_to_name(det_result->cls_id),
-//                det_result->box.left, det_result->box.top,
-//                det_result->box.right, det_result->box.bottom,
-//                det_result->prop);
-
-//         int x1 = det_result->box.left;
-//         int y1 = det_result->box.top;
-//         int x2 = det_result->box.right;
-//         int y2 = det_result->box.bottom;
-
-//         draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
-
-//         sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
-//         draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-//     }
-
-//     // 保存结果图像
-//     if (access(save_dir, F_OK) != 0) {
-//         mkdir(save_dir, 0755);
-//     }
-
-//     char save_path[256];
-//     snprintf(save_path, sizeof(save_path), "%s/out_%06d.png", save_dir, save_index++);
-//     write_image(save_path, &src_image);
-//     printf("save result image: %s\n", save_path);
-
-//     free(src_image.virt_addr);
-//     return true;
-// }
-
 
 void carpet_model_release()
 {
@@ -286,4 +319,3 @@ void carpet_model_release()
 
     printf("carpet_model_release finished");
 }
-

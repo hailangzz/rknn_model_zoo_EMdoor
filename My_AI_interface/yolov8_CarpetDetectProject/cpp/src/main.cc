@@ -27,15 +27,13 @@
 #include "transform_coordinates.h"
 // #include "carpet_detect_interface.h"
 
-#if defined(RV1106_1103) 
-    #include "dma_alloc.hpp"
+#if defined(RV1106_1103)
+#include "dma_alloc.hpp"
 #endif
 
 #include <sys/time.h>
 
-
 double __get_us(struct timeval t) { return (t.tv_sec * 1000000 + t.tv_usec); }
-
 
 /*-------------------------------------------
                   Main Function
@@ -49,16 +47,15 @@ int main(int argc, char **argv)
     Detector detector(config_info);
     CameraParameters camera_parameters(config_info);
 
-
     std::string image_path = "./model/carpet.jpg";
     image_buffer_t src_image;
     memset(&src_image, 0, sizeof(image_buffer_t));
     int ret = read_image(image_path.c_str(), &src_image);
 
 #if defined(RV1106_1103)
-    //RV1106 rga requires that input and output bufs are memory allocated by dma
-    ret = dma_buf_alloc(RV1106_CMA_HEAP_PATH, src_image.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd, 
-                       (void **) & (rknn_app_ctx.img_dma_buf.dma_buf_virt_addr));
+    // RV1106 rga requires that input and output bufs are memory allocated by dma
+    ret = dma_buf_alloc(RV1106_CMA_HEAP_PATH, src_image.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd,
+                        (void **)&(rknn_app_ctx.img_dma_buf.dma_buf_virt_addr));
     memcpy(rknn_app_ctx.img_dma_buf.dma_buf_virt_addr, src_image.virt_addr, src_image.size);
     dma_sync_cpu_to_device(rknn_app_ctx.img_dma_buf.dma_buf_fd);
     free(src_image.virt_addr);
@@ -66,7 +63,7 @@ int main(int argc, char **argv)
     src_image.fd = rknn_app_ctx.img_dma_buf.dma_buf_fd;
     rknn_app_ctx.img_dma_buf.size = src_image.size;
 #endif
-    
+
     if (ret != 0)
     {
         printf("read image fail! ret=%d image_path=%s\n", ret, image_path.c_str());
@@ -87,7 +84,7 @@ int main(int argc, char **argv)
 
     gettimeofday(&stop_time, NULL);
     printf("once run use %f ms\n", (__get_us(stop_time) - __get_us(start_time)) / 1000);
-    
+
     // 画框和概率
     char text[256];
     for (int i = 0; i < od_results.count; i++)
@@ -97,14 +94,14 @@ int main(int argc, char **argv)
                det_result->box.left, det_result->box.top,
                det_result->box.right, det_result->box.bottom,
                det_result->prop);
-        
+
         int x1 = det_result->box.left;
         int y1 = det_result->box.top;
         int x2 = det_result->box.right;
         int y2 = det_result->box.bottom;
 
         draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
-        
+
         printf("finish draw_rectangle!!!!! \n");
         // camera_parameters.ObjectboxToCameraXYZ(od_results.results[i].box, od_results.results[i].camera_coordinates);
         camera_parameters.ObjectboxToCameraXYZ(det_result->box, det_result->camera_coordinates);
@@ -120,13 +117,13 @@ out:
 
     if (src_image.virt_addr != NULL)
     {
-#if defined(RV1106_1103) 
-        dma_buf_free(rknn_app_ctx.img_dma_buf.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd, 
-                rknn_app_ctx.img_dma_buf.dma_buf_virt_addr);
+#if defined(RV1106_1103)
+        dma_buf_free(rknn_app_ctx.img_dma_buf.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd,
+                     rknn_app_ctx.img_dma_buf.dma_buf_virt_addr);
 #else
-        
+
         free(src_image.virt_addr);
-        
+
 #endif
     }
 
