@@ -62,14 +62,6 @@ bool carpet_detect_infer(const cv::Mat &img,
         return false;
     }
 
-    // printf("\n========== carpet_detect_infer ==========\n");
-    // printf("input image: w=%d h=%d c=%d\n",
-    //        img.cols,
-    //        img.rows,
-    //        img.channels());
-
-    // printf("input image data ptr: %p\n", img.data);
-
     // ================= 深拷贝，避免多线程 Mat 野指针 =================
     cv::Mat safe_img = img.clone();
 
@@ -121,13 +113,6 @@ bool carpet_detect_infer(const cv::Mat &img,
         printf("[ERROR] img_rgb still not continuous\n");
         return false;
     }
-
-    // printf("rgb image: w=%d h=%d c=%d\n",
-    //        img_rgb.cols,
-    //        img_rgb.rows,
-    //        img_rgb.channels());
-
-    // printf("rgb image ptr: %p\n", img_rgb.data);
 
     // ================= 构建 RKNN 输入 =================
     image_buffer_t src_image;
