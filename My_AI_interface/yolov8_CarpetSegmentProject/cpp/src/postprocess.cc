@@ -1574,6 +1574,73 @@ void smoothContour(
     }
 }
 
+void smoothContourOuterOnly(
+    const std::vector<cv::Point> &input,
+    std::vector<cv::Point> &output,
+    float smooth_factor) // smooth_factor: 平滑强度
+{
+    output.clear();
+
+    int n = input.size();
+
+    if (n < 3)
+    {
+        output = input;
+        return;
+    }
+
+    output.reserve(n);
+
+    for (int i = 0; i < n; ++i)
+    {
+        const auto &prev =
+            input[(i - 1 + n) % n];
+
+        const auto &curr =
+            input[i];
+
+        const auto &next =
+            input[(i + 1) % n];
+
+        // ============================================
+        // 邻域均值
+        // ============================================
+
+        float avg_x =
+            (prev.x + next.x) * 0.5f;
+
+        float avg_y =
+            (prev.y + next.y) * 0.5f;
+
+        // ============================================
+        // 当前点到均值方向
+        // ============================================
+
+        float dx =
+            curr.x - avg_x;
+
+        float dy =
+            curr.y - avg_y;
+
+        // ============================================
+        // 只轻微平滑
+        // 保留外轮廓
+        // ============================================
+
+        float new_x =
+            curr.x * (1.0f - smooth_factor) +
+            (avg_x + dx) * smooth_factor;
+
+        float new_y =
+            curr.y * (1.0f - smooth_factor) +
+            (avg_y + dy) * smooth_factor;
+
+        output.emplace_back(
+            static_cast<int>(std::round(new_x)),
+            static_cast<int>(std::round(new_y)));
+    }
+}
+
 inline float estimateDistance(float x, ConfigInfo &config)
 {
     float polyfit_result;

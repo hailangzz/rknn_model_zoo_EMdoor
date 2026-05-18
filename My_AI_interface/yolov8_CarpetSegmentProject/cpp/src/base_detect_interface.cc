@@ -241,7 +241,8 @@ bool real_detect_infer(
              j < contours_filtered.size();
              j++)
         {
-            smoothContour(
+            // 局部凸包平滑
+            smoothContourOuterOnly(
                 contours_filtered[j],
                 contours_smoothed[j]);
         }
@@ -331,19 +332,16 @@ bool real_detect_infer(
                 std::string save_name =
                     "carpet_detect_null_target_" +
                     std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
-                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
+                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性（没有达标的预测图像，只保存图像即可）
                 // g_ctx.debuger->saveIfDetected(
                 //     img,
                 //     save_name);
 
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        save_name);
-                }
+                g_ctx.debuger->saveSegLabel(
+                    img,
+                    debug_all_contours,
+                    debug_all_cls_ids,
+                    save_name);
             }
         }
         else // 空间位置不符合条件
@@ -353,14 +351,12 @@ bool real_detect_infer(
                 // g_ctx.debuger->saveIfDetected(
                 //     img,
                 //     "carpet_detect");
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        "carpet_detect");
-                }
+
+                g_ctx.debuger->saveSegLabel(
+                    img,
+                    debug_all_contours,
+                    debug_all_cls_ids,
+                    "carpet_detect");
             }
         }
     }

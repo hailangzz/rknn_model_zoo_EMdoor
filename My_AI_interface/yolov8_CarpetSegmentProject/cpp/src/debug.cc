@@ -331,6 +331,10 @@ void Debug::saveSegLabel(
         return;
     }
 
+    // =================================================
+    // 图像检查
+    // =================================================
+
     if (image.empty())
     {
         std::cerr
@@ -340,17 +344,12 @@ void Debug::saveSegLabel(
         return;
     }
 
-    if (contours.empty())
-    {
-        std::cerr
-            << "[Debug] contours empty"
-            << std::endl;
+    // =================================================
+    // contour 与 cls_id 数量检查
+    // =================================================
 
-        return;
-    }
-
-    // contour 和 class 数量必须一致
-    if (contours.size() != cls_ids.size())
+    if (!contours.empty() &&
+        contours.size() != cls_ids.size())
     {
         std::cerr
             << "[Debug] contours.size != cls_ids.size"
@@ -372,7 +371,6 @@ void Debug::saveSegLabel(
     std::string image_filename =
         generateFileName(tag);
 
-    // jpg -> txt
     std::string label_filename =
         image_filename.substr(
             0,
@@ -390,11 +388,14 @@ void Debug::saveSegLabel(
         0,
         sizeof(buf));
 
-    buf.width = image.cols;
+    buf.width =
+        image.cols;
 
-    buf.height = image.rows;
+    buf.height =
+        image.rows;
 
-    buf.format = IMAGE_FORMAT_RGB888;
+    buf.format =
+        IMAGE_FORMAT_RGB888;
 
     buf.size =
         image.total() *
@@ -413,6 +414,25 @@ void Debug::saveSegLabel(
         std::cerr
             << "[Debug] image save failed: "
             << image_filename
+            << std::endl;
+
+        return;
+    }
+
+    std::cout
+        << "[Debug] image saved: "
+        << image_filename
+        << std::endl;
+
+    // =================================================
+    // contour 为空
+    // 只保存图片，不保存 txt
+    // =================================================
+
+    if (contours.empty())
+    {
+        std::cout
+            << "[Debug] contours empty, skip label save"
             << std::endl;
 
         return;
@@ -445,7 +465,7 @@ void Debug::saveSegLabel(
         static_cast<float>(image.rows);
 
     // =================================================
-    // 写入每个 contour
+    // 写入 contour
     // =================================================
 
     for (size_t i = 0;
@@ -455,10 +475,10 @@ void Debug::saveSegLabel(
         const auto &contour =
             contours[i];
 
-        int cls_id =
+        const int cls_id =
             cls_ids[i];
 
-        // 至少3个点
+        // 至少需要3个点
         if (contour.size() < 3)
         {
             continue;
@@ -467,7 +487,7 @@ void Debug::saveSegLabel(
         // class id
         ofs << cls_id;
 
-        // polygon points
+        // polygon 点
         for (const auto &pt : contour)
         {
             float x =
@@ -476,7 +496,7 @@ void Debug::saveSegLabel(
             float y =
                 static_cast<float>(pt.y) / img_h;
 
-            // clamp
+            // clamp 到 [0,1]
             x = std::max(
                 0.0f,
                 std::min(1.0f, x));
@@ -497,6 +517,10 @@ void Debug::saveSegLabel(
     }
 
     ofs.close();
+
+    // =================================================
+    // 输出日志
+    // =================================================
 
     std::cout
         << "[Debug] seg label saved: "

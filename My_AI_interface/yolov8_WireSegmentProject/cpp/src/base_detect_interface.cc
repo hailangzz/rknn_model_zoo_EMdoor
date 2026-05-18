@@ -238,7 +238,8 @@ bool real_detect_infer(
              j < contours_mark_point_filtered.size();
              j++)
         {
-            smoothContour(
+            // 局部凸包平滑
+            smoothContourOuterOnly(
                 contours_mark_point_filtered[j],
                 contours_mark_point_smoothed[j]);
         }
@@ -347,14 +348,12 @@ bool real_detect_infer(
                 // g_ctx.debuger->saveIfDetected(
                 //     img,
                 //     save_name);
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        save_name);
-                }
+
+                g_ctx.debuger->saveSegLabel(
+                    img,
+                    debug_all_contours,
+                    debug_all_cls_ids,
+                    save_name);
             }
         }
         else
@@ -366,14 +365,12 @@ bool real_detect_infer(
                 // g_ctx.debuger->saveIfDetected(
                 //     img,
                 //     "carpet_detect");
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        "wire_detect");
-                }
+
+                g_ctx.debuger->saveSegLabel(
+                    img,
+                    debug_all_contours,
+                    debug_all_cls_ids,
+                    "wire_detect");
             }
         }
     }
