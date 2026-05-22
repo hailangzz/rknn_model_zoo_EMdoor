@@ -33,11 +33,12 @@
 
 // class rknn_app_context_t;
 
-typedef struct {
+typedef struct
+{
     image_rect_t box;
     float prop;
     int cls_id;
-    box_camera_coordinates camera_coordinates;   //新增相机坐标信息
+    box_camera_coordinates camera_coordinates; // 新增相机坐标信息
 
 } object_detect_result;
 
@@ -46,13 +47,13 @@ typedef struct
     uint8_t *seg_mask;
 } object_segment_result;
 
-typedef struct {
+typedef struct
+{
     int id;
     int count;
     object_detect_result results[OBJ_NUMB_MAX_SIZE];
     object_segment_result results_seg[OBJ_NUMB_MAX_SIZE];
 } object_detect_result_list;
-
 
 int init_post_process();
 void deinit_post_process();
@@ -66,18 +67,26 @@ void deinit_post_process();
 //                                std::vector<std::vector<cv::Point>> &out_contours);
 
 void extract_seg_mask_contours(
-    object_segment_result* seg,       // 只操作单个目标的 seg_mask
+    object_segment_result *seg, // 只操作单个目标的 seg_mask
     int width,
     int height,
     std::vector<std::vector<cv::Point>> &out_contours);
 
 void smoothContour(
-    const std::vector<cv::Point>& input,
-    std::vector<cv::Point>& output,
+    const std::vector<cv::Point> &input,
+    std::vector<cv::Point> &output,
     int win = 3);
 
-void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
-
-void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours,std::vector<std::vector<cv::Point>> &output_contours);
-
+void fillCameraDetectResult(const object_detect_result *det, ObjectCameraDetectResult &one, ConfigInfo &config);
+static void filterContourOutlierPoints(
+    const std::vector<cv::Point> &input,
+    std::vector<cv::Point> &output,
+    float max_jump_dist = 15.0f); // 👉 单个目标外边缘，离群点过滤。新增最大跳跃距离参数
+// void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours, std::vector<std::vector<cv::Point>> &output_contours);
+void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours, std::vector<std::vector<cv::Point>> &output_contours, const cv::Mat &img_rgb); // 新增输入图像参数
+bool isEdgePointValid(
+    const ObjectCameraDetectResult &one,
+    float max_dist,        // 👉 最大距离阈值（Z轴）作为参数传入
+    size_t min_points = 10 // 👉 最小边缘点数作为参数传入
+);
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_
