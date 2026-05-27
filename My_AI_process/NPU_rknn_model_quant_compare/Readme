@@ -1,0 +1,40 @@
+# 说明：此项目用于，在NPU板端，测试rknn模型量化后的精度损失。
+
+# 目录结构：
+# - NPU_rknn_model_quant_compare/
+#   - Readme         # 说明文件     
+#   - cpp            # C++ 源代码
+#   - models         # 模型文件
+#   - test_images    # 测试图像
+
+./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2_fp32.rknn \
+  ./model/carpet_sa_v2.rknn \
+  ./test_images/test.jpg
+
+./rknn_npu_quant_compare_demo \
+  ./model/carpet_f_seg_0512_fp.rknn \
+  ./model/carpet_f_seg_0512.rknn \
+  ./test_images/test.jpg
+
+
+./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2_fp32.rknn \
+  ./test_images/test.jpg
+
+./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2.rknn \
+  ./test_images/test.jpg
+
+
+# demo调试：
+gdb --args ./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2_fp32.rknn \
+  ./test_images/test.jpg
+
+gdb --args ./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2.rknn \
+  ./test_images/test.jpg
+
+
+
