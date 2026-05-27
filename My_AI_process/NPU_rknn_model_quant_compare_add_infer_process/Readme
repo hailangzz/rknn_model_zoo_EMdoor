@@ -10,31 +10,43 @@
 ./rknn_npu_quant_compare_demo \
   ./model/carpet_sa_v2_fp32.rknn \
   ./model/carpet_sa_v2.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
 
 ./rknn_npu_quant_compare_demo \
   ./model/carpet_f_seg_0512_fp.rknn \
   ./model/carpet_f_seg_0512.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
+
+./rknn_npu_quant_compare_demo \
+  ./model/carpet_sa_v2_fp32.rknn \
+  ./model/carpet_sa_v2.rknn \
+  ./test_images/image_343.jpg
+
 
 
 ./rknn_npu_quant_compare_demo \
   ./model/carpet_sa_v2_fp32.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
 
 ./rknn_npu_quant_compare_demo \
   ./model/carpet_sa_v2.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
 
 
 # demo调试：
 gdb --args ./rknn_npu_quant_compare_demo \
   ./model/carpet_sa_v2_fp32.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
 
 gdb --args ./rknn_npu_quant_compare_demo \
   ./model/carpet_sa_v2.rknn \
-  ./test_images/test.jpg
+  ./test_images/image_343.jpg
+
+
+gdb --args ./rknn_npu_quant_compare_demo \
+  ./model/carpet_f_seg_0512_fp.rknn \
+  ./model/carpet_f_seg_0512.rknn \
+  ./test_images/image_343.jpg
 
 
 

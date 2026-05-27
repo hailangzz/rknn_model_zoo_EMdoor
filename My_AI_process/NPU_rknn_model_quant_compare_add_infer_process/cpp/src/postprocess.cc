@@ -786,182 +786,219 @@ static int process_fp32(rknn_output *all_input, int input_id, int grid_h, int gr
     return validCount;
 }
 
-int post_process(rknn_app_context_t *app_ctx, rknn_output *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
+int post_process(rknn_app_context_t *app_ctx,
+                 rknn_output *outputs,
+                 letterbox_t *letter_box,
+                 float conf_threshold,
+                 float nms_threshold,
+                 object_detect_result_list *od_results)
 {
-
-    std::vector<float> filterBoxes;
-    std::vector<float> objProbs;
-    std::vector<int> classId;
-
-    std::vector<float> filterSegments;
-    float proto[PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT];
-    std::vector<float> filterSegments_by_nms;
+    // ---------------------------
+    // 静态内存池（避免反复 malloc）
+    // ---------------------------
+    static float *proto = NULL;
+    static uint8_t *seg_mask = NULL;
+    static uint8_t *single_mask = NULL;
+    static uint8_t *cropped_seg_mask = NULL;
 
     int model_in_width = app_ctx->model_width;
     int model_in_height = app_ctx->model_height;
 
-    int validCount = 0;
-    int stride = 0;
-    int grid_h = 0;
-    int grid_w = 0;
+    int proto_size = PROTO_CHANNEL * PROTO_HEIGHT * PROTO_WEIGHT;
+    int max_mask_size = model_in_height * model_in_width;
+
+    // 初始化一次
+    if (!proto)
+    {
+        proto = (float *)malloc(proto_size * sizeof(float));
+        seg_mask = (uint8_t *)malloc(OBJ_NUMB_MAX_SIZE * max_mask_size);
+        single_mask = (uint8_t *)malloc(max_mask_size);
+        cropped_seg_mask = (uint8_t *)malloc(max_mask_size);
+
+        if (!proto || !seg_mask || !single_mask || !cropped_seg_mask)
+        {
+            printf("malloc failed\n");
+            return -1;
+        }
+    }
+
+    std::vector<float> filterBoxes;
+    std::vector<float> objProbs;
+    std::vector<int> classId;
+    std::vector<float> filterSegments;
+    std::vector<float> filterSegments_by_nms;
 
     memset(od_results, 0, sizeof(object_detect_result_list));
+    memset(proto, 0, proto_size * sizeof(float));
 
+    int validCount = 0;
     int dfl_len = app_ctx->output_attrs[0].dims[1] / 4;
-    int output_per_branch = app_ctx->io_num.n_output / 3; // default 3 branch
 
-    // process the outputs of rknn
+    // ---------------------------
+    // 1️⃣ 解析输出
+    // ---------------------------
     for (int i = 0; i < 13; i++)
     {
-        grid_h = app_ctx->output_attrs[i].dims[2];
-        grid_w = app_ctx->output_attrs[i].dims[3];
-        stride = model_in_height / grid_h;
+        int grid_h = app_ctx->output_attrs[i].dims[2];
+        int grid_w = app_ctx->output_attrs[i].dims[3];
+        int stride = model_in_height / grid_h;
 
         if (app_ctx->is_quant)
         {
-            validCount += process_i8(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
-                                     classId, conf_threshold, app_ctx);
+            validCount += process_i8(outputs, i, grid_h, grid_w,
+                                     model_in_height, model_in_width,
+                                     stride, dfl_len,
+                                     filterBoxes, filterSegments, proto,
+                                     objProbs, classId,
+                                     conf_threshold, app_ctx);
         }
         else
         {
-            validCount += process_fp32(outputs, i, grid_h, grid_w, model_in_height, model_in_width, stride, dfl_len, filterBoxes, filterSegments, proto, objProbs,
-                                       classId, conf_threshold);
+            validCount += process_fp32(outputs, i, grid_h, grid_w,
+                                       model_in_height, model_in_width,
+                                       stride, dfl_len,
+                                       filterBoxes, filterSegments, proto,
+                                       objProbs, classId,
+                                       conf_threshold);
         }
     }
 
-    // nms
     if (validCount <= 0)
-    {
         return 0;
-    }
-    std::vector<int> indexArray;
-    for (int i = 0; i < validCount; ++i)
-    {
-        indexArray.push_back(i);
-    }
+
+    // ---------------------------
+    // 2️⃣ NMS
+    // ---------------------------
+    std::vector<int> indexArray(validCount);
+    for (int i = 0; i < validCount; i++)
+        indexArray[i] = i;
 
     quick_sort_indice_inverse(objProbs, 0, validCount - 1, indexArray);
 
     std::set<int> class_set(std::begin(classId), std::end(classId));
-
     for (auto c : class_set)
-    {
         nms(validCount, filterBoxes, classId, indexArray, c, nms_threshold);
-    }
 
     int last_count = 0;
-    od_results->count = 0;
+
+    std::vector<float> filterBoxes_by_nms;
+    std::vector<int> cls_id;
 
     for (int i = 0; i < validCount; ++i)
     {
         if (indexArray[i] == -1 || last_count >= OBJ_NUMB_MAX_SIZE)
-        {
             continue;
-        }
+
         int n = indexArray[i];
 
         float x1 = filterBoxes[n * 4 + 0];
         float y1 = filterBoxes[n * 4 + 1];
         float x2 = x1 + filterBoxes[n * 4 + 2];
         float y2 = y1 + filterBoxes[n * 4 + 3];
-        int id = classId[n];
-        float obj_conf = objProbs[i];
+
+        filterBoxes_by_nms.push_back(x1);
+        filterBoxes_by_nms.push_back(y1);
+        filterBoxes_by_nms.push_back(x2);
+        filterBoxes_by_nms.push_back(y2);
+
+        cls_id.push_back(classId[n]);
 
         for (int k = 0; k < PROTO_CHANNEL; k++)
-        {
             filterSegments_by_nms.push_back(filterSegments[n * PROTO_CHANNEL + k]);
-        }
 
         od_results->results[last_count].box.left = x1;
         od_results->results[last_count].box.top = y1;
         od_results->results[last_count].box.right = x2;
         od_results->results[last_count].box.bottom = y2;
+        od_results->results[last_count].prop = objProbs[i];
+        od_results->results[last_count].cls_id = classId[n];
 
-        od_results->results[last_count].prop = obj_conf;
-        od_results->results[last_count].cls_id = id;
+        printf("Box %d: class=%s, prop=%.2f, box=[%d, %d, %d, %d]\n",
+               last_count,
+               coco_cls_to_name(classId[n]),
+               objProbs[i],
+               (int)od_results->results[last_count].box.left,
+               (int)od_results->results[last_count].box.top,
+               (int)od_results->results[last_count].box.right,
+               (int)od_results->results[last_count].box.bottom);
+
+        // 还原原图坐标
+        od_results->results[last_count].box.left = box_reverse(od_results->results[last_count].box.left, model_in_width, letter_box->x_pad, letter_box->scale);
+        od_results->results[last_count].box.top = box_reverse(od_results->results[last_count].box.top, model_in_height, letter_box->y_pad, letter_box->scale);
+        od_results->results[last_count].box.right = box_reverse(od_results->results[last_count].box.right, model_in_width, letter_box->x_pad, letter_box->scale);
+        od_results->results[last_count].box.bottom = box_reverse(od_results->results[last_count].box.bottom, model_in_height, letter_box->y_pad, letter_box->scale);
+
         last_count++;
     }
-    od_results->count = last_count;
-    int boxes_num = od_results->count;
 
-    float filterBoxes_by_nms[boxes_num * 4];
-    int cls_id[boxes_num];
+    od_results->count = last_count;
+
+    int boxes_num = std::min(last_count, 5); // 👉 限制数量（防OOM）
+
+    if (boxes_num <= 0)
+        return 0;
+
+    // ---------------------------
+    // 3️⃣ matmul + resize
+    // ---------------------------
+    uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT);
+
+    matmul_by_cpu_uint8(filterSegments_by_nms,
+                        proto,
+                        matmul_out,
+                        boxes_num,
+                        PROTO_CHANNEL,
+                        PROTO_HEIGHT * PROTO_WEIGHT);
+
+    resize_by_opencv_uint8(matmul_out,
+                           PROTO_WEIGHT,
+                           PROTO_HEIGHT,
+                           boxes_num,
+                           seg_mask,
+                           model_in_width,
+                           model_in_height);
+
+    free(matmul_out);
+
+    // ---------------------------
+    // 4️⃣ mask处理（关键修复点）
+    // ---------------------------
     for (int i = 0; i < boxes_num; i++)
     {
-        // for crop_mask
-        filterBoxes_by_nms[i * 4 + 0] = od_results->results[i].box.left;   // x1;
-        filterBoxes_by_nms[i * 4 + 1] = od_results->results[i].box.top;    // y1;
-        filterBoxes_by_nms[i * 4 + 2] = od_results->results[i].box.right;  // x2;
-        filterBoxes_by_nms[i * 4 + 3] = od_results->results[i].box.bottom; // y2;
-        cls_id[i] = od_results->results[i].cls_id;
+        int ori_size = app_ctx->input_image_width * app_ctx->input_image_height;
 
-        // get real box
-        od_results->results[i].box.left = box_reverse(od_results->results[i].box.left, model_in_width, letter_box->x_pad, letter_box->scale);
-        od_results->results[i].box.top = box_reverse(od_results->results[i].box.top, model_in_height, letter_box->y_pad, letter_box->scale);
-        od_results->results[i].box.right = box_reverse(od_results->results[i].box.right, model_in_width, letter_box->x_pad, letter_box->scale);
-        od_results->results[i].box.bottom = box_reverse(od_results->results[i].box.bottom, model_in_height, letter_box->y_pad, letter_box->scale);
+        // 👉 分配输出mask（避免段错误）
+        if (!od_results->results_seg[i].seg_mask)
+        {
+            od_results->results_seg[i].seg_mask =
+                (uint8_t *)malloc(ori_size);
+        }
+
+        memset(single_mask, 0, max_mask_size);
+
+        crop_mask_uint8(seg_mask,
+                        single_mask,
+                        &filterBoxes_by_nms[i * 4],
+                        1,
+                        &cls_id[i],
+                        model_in_height,
+                        model_in_width);
+
+        int cropped_height = model_in_height - letter_box->y_pad * 2;
+        int cropped_width = model_in_width - letter_box->x_pad * 2;
+
+        seg_reverse(single_mask,
+                    cropped_seg_mask,
+                    od_results->results_seg[i].seg_mask,
+                    model_in_height,
+                    model_in_width,
+                    cropped_height,
+                    cropped_width,
+                    app_ctx->input_image_height,
+                    app_ctx->input_image_width,
+                    letter_box->y_pad,
+                    letter_box->x_pad);
     }
-
-#ifdef USE_FP_RESIZE
-    timer.tik();
-    // compute the mask through Matmul
-    int ROWS_A = boxes_num;
-    int COLS_A = PROTO_CHANNEL;
-    int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
-    float *matmul_out = (float *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(float));
-    matmul_by_cpu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
-    // matmul_by_npu_fp(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B, app_ctx);
-    timer.tok();
-    timer.print_time("matmul_by_cpu_fp");
-
-    timer.tik();
-    // resize to (boxes_num, model_in_width, model_in_height)
-    float *seg_mask = (float *)malloc(boxes_num * model_in_height * model_in_width * sizeof(float));
-    resize_by_opencv_fp(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
-    timer.tok();
-    timer.print_time("resize_by_opencv_fp");
-
-    timer.tik();
-    // crop mask
-    uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
-    memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
-    crop_mask_fp(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
-    timer.tok();
-    timer.print_time("crop_mask_fp");
-#else
-    // compute the mask through Matmul
-    int ROWS_A = boxes_num;
-    int COLS_A = PROTO_CHANNEL;
-    int COLS_B = PROTO_HEIGHT * PROTO_WEIGHT;
-    uint8_t *matmul_out = (uint8_t *)malloc(boxes_num * PROTO_HEIGHT * PROTO_WEIGHT * sizeof(uint8_t));
-    matmul_by_cpu_uint8(filterSegments_by_nms, proto, matmul_out, ROWS_A, COLS_A, COLS_B);
-
-    uint8_t *seg_mask = (uint8_t *)malloc(boxes_num * model_in_height * model_in_width * sizeof(uint8_t));
-    resize_by_opencv_uint8(matmul_out, PROTO_WEIGHT, PROTO_HEIGHT, boxes_num, seg_mask, model_in_width, model_in_height);
-
-    // crop mask
-    uint8_t *all_mask_in_one = (uint8_t *)malloc(model_in_height * model_in_width * sizeof(uint8_t));
-    memset(all_mask_in_one, 0, model_in_height * model_in_width * sizeof(uint8_t));
-    crop_mask_uint8(seg_mask, all_mask_in_one, filterBoxes_by_nms, boxes_num, cls_id, model_in_height, model_in_width);
-
-#endif
-
-    // get real mask
-    int cropped_height = model_in_height - letter_box->y_pad * 2;
-    int cropped_width = model_in_width - letter_box->x_pad * 2;
-    int ori_in_height = app_ctx->input_image_height;
-    int ori_in_width = app_ctx->input_image_width;
-    int y_pad = letter_box->y_pad;
-    int x_pad = letter_box->x_pad;
-    uint8_t *cropped_seg_mask = (uint8_t *)malloc(cropped_height * cropped_width * sizeof(uint8_t));
-    uint8_t *real_seg_mask = (uint8_t *)malloc(ori_in_height * ori_in_width * sizeof(uint8_t));
-    seg_reverse(all_mask_in_one, cropped_seg_mask, real_seg_mask,
-                model_in_height, model_in_width, cropped_height, cropped_width, ori_in_height, ori_in_width, y_pad, x_pad);
-    od_results->results_seg[0].seg_mask = real_seg_mask;
-    free(all_mask_in_one);
-    free(cropped_seg_mask);
-    free(seg_mask);
-    free(matmul_out);
 
     return 0;
 }
