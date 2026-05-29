@@ -159,8 +159,8 @@ bool real_detect_infer(
     // 统计
     // ========================================================
 
-    float box_max_prop =
-        std::numeric_limits<float>::lowest();
+    // float box_max_prop = std::numeric_limits<float>::lowest();
+    float box_max_prop = 0.0f;
 
     // ========================================================
     // 遍历检测结果
@@ -290,7 +290,7 @@ bool real_detect_infer(
         // ====================================================
 
         ObjectSize3D size;
-
+        // 进行尺寸计算，主要用于过滤掉一些不合理的检测结果（例如过大或过小的区域），以及为后续的跟踪和分析提供尺寸信息
         calcObjectSizeByAverage(
             one,
             size);
@@ -304,71 +304,37 @@ bool real_detect_infer(
     {
         if (g_ctx.g_pose_sampler->IsPoseSaveImage) // 空间位置符合条件
         {
-            bool is_useful_prop = box_max_prop > g_ctx.config.score_threshold;
-            g_ctx.debuger->updateSavedPoseImageCount(is_useful_prop); // 更新基于空间的，图像目标有效性计数
-
-            if (is_useful_prop) // 置信度符合条件
+            // target_status: 判断当前图像的目标状态
+            TargetStatus target_status;
+            if (box_max_prop > g_ctx.config.score_threshold)
             {
-                std::string save_name =
-                    "carpet_detect_exist_target_" +
-                    std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
-
-                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     save_name);
-
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        save_name);
-                }
+                target_status = TargetStatus::EXISTS;
+            }
+            else if (box_max_prop > g_ctx.config.debug_score_threshold)
+            {
+                target_status = TargetStatus::MIDDLE;
             }
             else
             {
-                std::string save_name =
-                    "carpet_detect_null_target_" +
-                    std::to_string(g_ctx.debuger->getSavedPoseImageCount(is_useful_prop));
-                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性（没有达标的预测图像，只保存图像即可）
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     save_name);
-
-                g_ctx.debuger->saveSegLabel(
-                    img,
-                    debug_all_contours,
-                    debug_all_cls_ids,
-                    save_name);
+                // 由于在yolov8_detect中BOX_THRESH设置为0.35，因此此处confidence已被过滤掉，一直为0，所以当置信度较低时，直接归为NONE状态
+                target_status = TargetStatus::NONE;
             }
-        }
-        else // 空间位置不符合条件
-        {
-            if (box_max_prop > g_ctx.config.debug_score_threshold) // 置信度符合,感兴趣阈值。则进行保存，主要用于分析空间位置不符合条件时，是否存在高置信度的检测结果
-            {
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     "carpet_detect");
 
-                g_ctx.debuger->saveSegLabel(
-                    img,
-                    debug_all_contours,
-                    debug_all_cls_ids,
-                    "carpet_detect");
-            }
+            g_ctx.debuger->updateSavedPoseImageCount(target_status); // 更新基于空间的，图像目标有效性计数
+
+            std::string task_name = "carpet_detect";
+
+            std::string save_sample_info_string = g_ctx.debuger->set_ai_capture_save_info(g_ctx.debuger->device_id_sn, task_name, TargetStatusToStr(target_status), box_max_prop); // 设置AI自动化迭代的图像保存信息
+
+            g_ctx.debuger->saveSegLabel(
+                img,
+                debug_all_contours,
+                debug_all_cls_ids,
+                task_name,
+                save_sample_info_string,
+                target_status);
         }
     }
-
-    // if (g_ctx.debuger &&
-    //     box_max_prop >
-    //         g_ctx.config.debug_score_threshold)
-    // {
-    //     g_ctx.debuger->saveIfDetected(
-    //         img,
-    //         "carpet_detect");
-    // }
 
     // ========================================================
     // Debug输出
@@ -434,13 +400,14 @@ bool base_detect_infer(
         g_ctx.g_pose_sampler->NeedSaveFrame(
             position,
             q);
-
+    // 当空间位置状态，不符合图像存储条件时；
     if (!g_ctx.g_pose_sampler->IsPoseSaveImage)
     {
         g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_debug_images_path);
 
         printf("skip infer, duplicated pose area\n");
     }
+    // 当空间位置状态，符合图像存储条件时；
     else
     {
         g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_images_path_spatial_location_val);
@@ -449,7 +416,7 @@ bool base_detect_infer(
     // ========================================================
     // 调用原始推理
     // ========================================================
-
+    printf("Calling real_detect_infer\n");
     return real_detect_infer(
         img,
         results);

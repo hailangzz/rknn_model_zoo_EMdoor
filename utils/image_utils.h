@@ -65,7 +65,7 @@ int convert_image_with_letterbox(image_buffer_t* src_image, image_buffer_t* dst_
  * @param image [in] Image
  * @return int image size
  */
-int get_image_size(image_buffer_t* image);
+int get_image_size(const image_buffer_t* image);
 void wrap_nv21_to_image_buffer(const uint8_t* nv21, int width,int height,image_buffer_t* out_buf);
 bool wrap_nv21_to_image_buffer_safe(const uint8_t* nv21, size_t nv21_size, int width, int height, image_buffer_t* out_buf);
 
