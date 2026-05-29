@@ -1831,7 +1831,7 @@ void filter_mask_contours(
         float aspect_ratio = (float)rect.width / rect.height;
 
         // 作用：过滤异常细长的区域（如边缘噪声、电线误检等）
-        if (aspect_ratio > 10.0 || aspect_ratio < 0.1)
+        if (aspect_ratio > 30.0 || aspect_ratio < 0.03)
             continue;
 
         // -----------------------------
@@ -1853,7 +1853,7 @@ void filter_mask_contours(
         // 作用：
         // - 过滤“很空”的区域（例如细线、噪声、破碎mask）
         // - 对扫地机器人识别电线特别有效
-        if (fill_ratio < 0.2) // ⚠️ 可调参数（0.1~0.5）
+        if (fill_ratio < 0.05) // ⚠️ 可调参数（0.1~0.02）
             continue;
 
         // -----------------------------
