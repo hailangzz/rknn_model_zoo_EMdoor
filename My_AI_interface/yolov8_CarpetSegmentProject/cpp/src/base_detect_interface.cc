@@ -290,7 +290,7 @@ bool real_detect_infer(
         // ====================================================
 
         ObjectSize3D size;
-
+        // 进行尺寸计算，主要用于过滤掉一些不合理的检测结果（例如过大或过小的区域），以及为后续的跟踪和分析提供尺寸信息
         calcObjectSizeByAverage(
             one,
             size);
@@ -316,6 +316,7 @@ bool real_detect_infer(
             }
             else
             {
+                // 由于在yolov8_detect中BOX_THRESH设置为0.35，因此此处confidence已被过滤掉，一直为0，所以当置信度较低时，直接归为NONE状态
                 target_status = TargetStatus::NONE;
             }
 
