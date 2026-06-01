@@ -3,7 +3,7 @@
 // 预测框置信度
 
 //linuxs
-model_path=./model/hand_f_v3.rknn
+model_path=./model/hand_f_v3_3588_0601.rknn
 labels_info=./model/labels_list.txt
 
 
