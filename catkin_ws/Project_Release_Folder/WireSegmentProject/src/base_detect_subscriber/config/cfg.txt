@@ -2,10 +2,21 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-model_path=./model/wire_f_v3_3588_960p.rknn
+//model_path=./model/wire_f_v3_3588_960_576.rknn
+//input_width=960
+//input_height=576
+
+model_path=./model/wire_f_v3_3588_960p_0522.rknn
 input_width=960
 input_height=960
 
+//model_path=./model/wire_f_v3_3588_640p.rknn
+//input_width=640
+//input_height=640
+
+//model_path=./model/wire_f_v3_3588_1280p.rknn
+//input_width=1280
+//input_height=1280
 
 score_threshold=0.7f
 
@@ -36,3 +47,10 @@ camera_D_4=0.003289
 camera_D_5=1.455798
 camera_D_6=0.474246
 camera_D_7=0.024653
+
+//debug配置管理
+debug_score_threshold=0.45f
+//save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/CarpetSegmentProject/images
+save_debug_images_path=/home/robot/share/AI_Program/WireSegmentProject/images
+is_save_debug_images=true
+fps_limit=5
