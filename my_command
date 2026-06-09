@@ -19,6 +19,7 @@ onnx 模型转rknn:
   ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_WireDetect
 
   ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_liquid_detect
+  ./build-linux.sh -t rk3588 -a aarch64 -d yolov8_seg_carpet
 
 
   ./build-linux-my-program.sh -t rk3588 -a aarch64 -d yolov8_CarpetDetectProject
