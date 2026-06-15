@@ -2,7 +2,7 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-model_path=./model/carpet_f_seg_0416.rknn
+model_path=./model/carpet_f_seg_0615.rknn
 input_width=640
 input_height=640
 score_threshold=0.7f
