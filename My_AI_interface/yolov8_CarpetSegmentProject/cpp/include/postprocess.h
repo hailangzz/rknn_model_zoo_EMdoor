@@ -74,5 +74,6 @@ void smoothContour(
 void fillCameraDetectResult(const object_detect_result *det, ObjectCameraDetectResult &one, ConfigInfo &config);
 
 void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours, std::vector<std::vector<cv::Point>> &output_contours);
+bool isEdgePointValid(const ObjectCameraDetectResult &one, float max_dist, size_t min_points); // 判断边界点是否合法（基于距离和数量，对目标进行筛选，剔除远距离误检目标）
 
 #endif //_RKNN_YOLOV8_DEMO_POSTPROCESS_H_

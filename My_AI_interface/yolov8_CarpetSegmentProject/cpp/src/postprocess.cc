@@ -1605,3 +1605,33 @@ void filter_mask_contours(
         output_contours.push_back(approx);
     }
 }
+
+bool isEdgePointValid(
+    const ObjectCameraDetectResult &one,
+    float max_dist,
+    size_t min_points // 👉 最小边缘点数作为参数传入
+)
+{
+    const auto &pts = one.add_edge_point_single_pixel_camera_coordinates;
+
+    // printf("into isEdgePointValid, edge point num = %zu\n", pts.size());
+
+    // 👉 1. 点数过滤
+    if (pts.size() < min_points)
+    {
+        // printf("Invalid: too few edge points (%zu < %zu)\n", pts.size(), min_points);
+        return false;
+    }
+
+    // 👉 2. 距离过滤
+    for (const auto &pt : pts)
+    {
+        if (pt.Z > max_dist)
+        {
+            // printf("\nInvalid edge point found with Z = %f\n\n", pt.Z);
+            return false;
+        }
+    }
+
+    return true;
+}

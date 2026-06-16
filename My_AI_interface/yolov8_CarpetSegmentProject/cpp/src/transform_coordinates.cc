@@ -1,6 +1,5 @@
 #include "transform_coordinates.h"
-#include <cstring>   // for memset
-
+#include <cstring> // for memset
 
 #include <cstdio>
 #include <ctime>
@@ -12,23 +11,22 @@ static void appendCameraLog(float u, float v,
                             float H, float pitch,
                             float X, float Y, float Z)
 {
-    FILE* fp = fopen("/home/robot/zhangzhuo/catkin_ws/logs/camera_xyz_debug.log", "a");
+    FILE *fp = fopen("/home/robot/zhangzhuo/catkin_ws/logs/camera_xyz_debug.log", "a");
     if (!fp)
         return;
 
     // 时间戳（方便你区分多次调用）
     std::time_t t = std::time(nullptr);
-    std::tm* tm = std::localtime(&t);
+    std::tm *tm = std::localtime(&t);
 
     fprintf(fp,
-        "\n[%04d-%02d-%02d %02d:%02d:%02d]\n",
-        tm->tm_year + 1900,
-        tm->tm_mon + 1,
-        tm->tm_mday,
-        tm->tm_hour,
-        tm->tm_min,
-        tm->tm_sec
-    );
+            "\n[%04d-%02d-%02d %02d:%02d:%02d]\n",
+            tm->tm_year + 1900,
+            tm->tm_mon + 1,
+            tm->tm_mday,
+            tm->tm_hour,
+            tm->tm_min,
+            tm->tm_sec);
 
     fprintf(fp, "Pixel: u=%.2f v=%.2f\n", u, v);
 
@@ -54,7 +52,6 @@ static void appendCameraLog(float u, float v,
     fflush(fp);
     fclose(fp);
 }
-
 
 // bool CameraParameters::pixelToCameraXYZGround(float u, float v, single_pixel_camera_coordinates &camera_coordinates){
 
@@ -108,14 +105,12 @@ bool CameraParameters::pixelToCameraXYZGround(
     const float cx_ = cx / scale_x;
     const float cy_ = cy / scale_y;
 
-    const cv::Mat K = (cv::Mat_<double>(3,3) <<
-        fx_,  0.0, cx_,
-        0.0, fy_,  cy_,
-        0.0, 0.0,  1.0);
+    const cv::Mat K = (cv::Mat_<double>(3, 3) << fx_, 0.0, cx_,
+                       0.0, fy_, cy_,
+                       0.0, 0.0, 1.0);
 
-    const cv::Mat D = (cv::Mat_<double>(1,8) <<
-        D_0, D_1, D_2, D_3,
-        D_4, D_5, D_6, D_7);
+    const cv::Mat D = (cv::Mat_<double>(1, 8) << D_0, D_1, D_2, D_3,
+                       D_4, D_5, D_6, D_7);
 
     // ================================
     // 3. 去畸变 → 归一化相机坐标
@@ -144,8 +139,8 @@ bool CameraParameters::pixelToCameraXYZGround(
     const float sin_p = std::sin(pitch);
 
     const float Xw = Xc;
-    const float Yw =  cos_p * Yc - sin_p * Zc;
-    const float Zw =  sin_p * Yc + cos_p * Zc;
+    const float Yw = cos_p * Yc - sin_p * Zc;
+    const float Zw = sin_p * Yc + cos_p * Zc;
 
     // ================================
     // 6. 射线与地面 Y = 0 求交
@@ -168,7 +163,6 @@ bool CameraParameters::pixelToCameraXYZGround(
     // printf("camera_coordinates info is  X:%f,Y:%f,Z:%f.\n",camera_coordinates.X,camera_coordinates.Y,camera_coordinates.Z);
     return true;
 }
-
 
 // //当前可用转换代码；
 // bool CameraParameters::pixelToCameraXYZGround(float u, float v,single_pixel_camera_coordinates &camera_coordinates)
@@ -250,15 +244,10 @@ bool CameraParameters::pixelToCameraXYZGround(
 //         camera_coordinates.Y = 0.0f;
 //         camera_coordinates.Z = -(t * Zd);
 
-        
-        
-
 //         return true;
 //     }
 
-
-
-bool CameraParameters::XYZGroundTopixel(single_pixel_camera_coordinates P,float &u, float &v)
+bool CameraParameters::XYZGroundTopixel(single_pixel_camera_coordinates P, float &u, float &v)
 {
     float k1 = D_0;
     float k2 = D_1;
@@ -292,11 +281,7 @@ bool CameraParameters::XYZGroundTopixel(single_pixel_camera_coordinates P,float 
     v = fy * y_prime + cy;
 
     return true;
-
 }
-
-
-
 
 // bool CameraParameters::pixelToCameraXYZGround(
 //     float u, float v,
@@ -333,12 +318,12 @@ bool CameraParameters::XYZGroundTopixel(single_pixel_camera_coordinates P,float 
 //     return true;
 // }
 
-
 bool CameraParameters::ObjectboxToCameraXYZ(
-    object_detect_result* det,
+    object_detect_result *det,
     const std::vector<std::vector<cv::Point>> &contours_mark_point)
 {
-    if (!det) return false;
+    if (!det)
+        return false;
 
     // printf("det->box.left: %d\n", det->box.left);
     // printf("det->box.top: %d\n", det->box.top);
@@ -346,22 +331,26 @@ bool CameraParameters::ObjectboxToCameraXYZ(
     // printf("det->box.bottom: %d\n", det->box.bottom);
 
     // ---------- 1. 四个角点 ----------
-    if (!pixelToCameraXYZGround(det->box.left, det->box.top, det->camera_coordinates.left_top)) {
+    if (!pixelToCameraXYZGround(det->box.left, det->box.top, det->camera_coordinates.left_top))
+    {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for left_top (%d,%d)\n",
                 det->box.left, det->box.top);
     }
 
-    if (!pixelToCameraXYZGround(det->box.right, det->box.top, det->camera_coordinates.right_top)) {
+    if (!pixelToCameraXYZGround(det->box.right, det->box.top, det->camera_coordinates.right_top))
+    {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for right_top (%d,%d)\n",
                 det->box.right, det->box.top);
     }
 
-    if (!pixelToCameraXYZGround(det->box.right, det->box.bottom, det->camera_coordinates.right_bottom)) {
+    if (!pixelToCameraXYZGround(det->box.right, det->box.bottom, det->camera_coordinates.right_bottom))
+    {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for right_bottom (%d,%d)\n",
                 det->box.right, det->box.bottom);
     }
 
-    if (!pixelToCameraXYZGround(det->box.left, det->box.bottom, det->camera_coordinates.left_bottom)) {
+    if (!pixelToCameraXYZGround(det->box.left, det->box.bottom, det->camera_coordinates.left_bottom))
+    {
         fprintf(stderr, "[ERROR] pixelToCameraXYZGround failed for left_bottom (%d,%d)\n",
                 det->box.left, det->box.bottom);
     }
@@ -378,41 +367,40 @@ bool CameraParameters::ObjectboxToCameraXYZ(
 
     // ---------- 2. 边缘点 ----------
     // 先清空旧边缘点指针（防止野指针）
-    if (det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates) {
+    if (det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates)
+    {
         free(det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates);
         det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates = nullptr;
         det->camera_coordinates.add_edge_point_num = 0;
     }
 
-    
-
-
     // 统计总边缘点数量
     int total_points = 0;
-    for (const auto &contour : contours_mark_point) total_points += static_cast<int>(contour.size());
-    if (total_points == 0) return true;
+    for (const auto &contour : contours_mark_point)
+        total_points += static_cast<int>(contour.size());
+    if (total_points == 0)
+        return true;
 
-    
     // 分配内存
     det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates =
         (single_pixel_camera_coordinates *)malloc(
-            total_points * sizeof(single_pixel_camera_coordinates)
-        );
-    if (!det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates) {
+            total_points * sizeof(single_pixel_camera_coordinates));
+    if (!det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates)
+    {
         fprintf(stderr, "[ERROR] malloc failed for edge points\n");
         return false;
     }
 
-
     // 填充边缘点
     det->camera_coordinates.add_edge_point_num = 0;
-    for (const auto &contour : contours_mark_point) {
-        for (const auto &pt : contour) {
+    for (const auto &contour : contours_mark_point)
+    {
+        for (const auto &pt : contour)
+        {
             single_pixel_camera_coordinates cam_pt;
-            if (pixelToCameraXYZGround(pt.x, pt.y, cam_pt)) {
-                det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[
-                    det->camera_coordinates.add_edge_point_num++
-                ] = cam_pt;
+            if (pixelToCameraXYZGround(pt.x, pt.y, cam_pt))
+            {
+                det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[det->camera_coordinates.add_edge_point_num++] = cam_pt;
             }
         }
     }
@@ -422,7 +410,6 @@ bool CameraParameters::ObjectboxToCameraXYZ(
     //     const auto &p = det->camera_coordinates.add_edge_point_single_pixel_camera_coordinates[i];
     //     printf("Edge point %d: X:%f Y:%f Z:%f\n", i, p.X, p.Y, p.Z);
     // }
-
 
     // // ---------- 3. 打印左下角信息 ----------
     // // const auto &lb = det->camera_coordinates.left_bottom;
@@ -450,15 +437,10 @@ bool CameraParameters::ObjectboxToCameraXYZ(
     //     printf("Left Top: invalid\n");
     // }
 
-   
-
-
     return true;
 }
 
-
-
-static inline float distance3D(const CameraCoordinate& a, const CameraCoordinate& b)
+static inline float distance3D(const CameraCoordinate &a, const CameraCoordinate &b)
 {
     float dx = a.X - b.X;
     float dy = a.Y - b.Y;
@@ -467,28 +449,52 @@ static inline float distance3D(const CameraCoordinate& a, const CameraCoordinate
 }
 
 // 计算物体宽度、高度
-bool calcObjectSizeByAverage(ObjectCameraDetectResult& one,ObjectSize3D& size_out)
+bool calcObjectSizeByAverage(
+    ObjectCameraDetectResult &one,
+    ObjectSize3D &size_out,
+    float min_width,
+    float min_height)
 {
     // 四个顶点
-    const CameraCoordinate& lt = one.coords[0]; // left_top
-    const CameraCoordinate& rt = one.coords[1]; // right_top
-    const CameraCoordinate& rb = one.coords[2]; // right_bottom
-    const CameraCoordinate& lb = one.coords[3]; // left_bottom
+    const CameraCoordinate &lt = one.coords[0];
+    const CameraCoordinate &rt = one.coords[1];
+    const CameraCoordinate &rb = one.coords[2];
+    const CameraCoordinate &lb = one.coords[3];
 
     // 宽度（上边 & 下边）
-    float width_top    = distance3D(lt, rt);
+    float width_top = distance3D(lt, rt);
     float width_bottom = distance3D(lb, rb);
 
     // 高度（左边 & 右边）
-    float height_left  = distance3D(lt, lb);
+    float height_left = distance3D(lt, lb);
     float height_right = distance3D(rt, rb);
 
     // 平均
-    size_out.width  = (width_top + width_bottom) * 0.5f;
+    size_out.width = (width_top + width_bottom) * 0.5f;
     size_out.height = (height_left + height_right) * 0.5f;
 
+    //----------------------------------
     // 基本合法性检查
-    if (size_out.width <= 0.0f || size_out.height <= 0.0f) {
+    //----------------------------------
+    if (size_out.width <= 0.0f ||
+        size_out.height <= 0.0f)
+    {
+        return false;
+    }
+
+    //----------------------------------
+    // 尺寸过滤（单位：米）
+    //----------------------------------
+    float MIN_WIDTH = min_width;   // 20cm
+    float MIN_HEIGHT = min_height; // 20cm
+
+    if (size_out.width < MIN_WIDTH ||
+        size_out.height < MIN_HEIGHT)
+    {
+        printf("object too small: width=%.3f height=%.3f\n",
+               size_out.width,
+               size_out.height);
+
         return false;
     }
 

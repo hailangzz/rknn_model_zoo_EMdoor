@@ -1,5 +1,6 @@
 #include "base_detect_interface.h"
 #include "detect_context.h"
+#include "track_filter.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -21,6 +22,7 @@ bool base_model_init(const char *config_path)
 
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
+    g_ctx.detection_track_filter = new TrackFilter(3, 2, 5, 120.0f, 2.5f);
 
     g_ctx.initialized = true;
 
@@ -136,20 +138,42 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
 
         fillCameraDetectResult(det, one, g_ctx.config); // 结果值填充
 
-        results.push_back(one);
+        if (!isEdgePointValid(one, 5.0f, 5)) // 过滤掉边缘点超过 5 米，或者边缘点数量小于 6 的目标（剔除远距离误检目标）
+        {
+            continue;
+        }
+        // printf("Valid edge points: %zu\n", one.add_edge_point_single_pixel_camera_coordinates.size());
 
-        // 边框合法性校验：
+        // 边框合法性校验：过滤掉宽、高小于20厘米的目标
         ObjectSize3D size;
-        if (calcObjectSizeByAverage(one, size))
+        float min_width = 0.20f;  // 20cm
+        float min_height = 0.20f; // 20cm
+        if (!calcObjectSizeByAverage(one, size, min_width, min_height))
         {
             // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
+            continue;
         }
+
+        results.push_back(one);
     }
+
+    //--------------------------------------
+    // 时序滤波,过滤掉瞬间误检，及瞬间漏检目标（注意：此功能要防止干扰样本采集）
+    //--------------------------------------
+
+    std::vector<ObjectCameraDetectResult> track_filtered_results;
+
+    g_ctx.detection_track_filter->update(
+        results,
+        track_filtered_results);
+    results.swap(track_filtered_results);
+
+    // 后面继续使用 results
 
     // 调试输出
     // 打印总数量
     printf("od_results.count: %d\n", od_results.count);
-    for (int i = 0; i < od_results.count; i++)
+    for (size_t i = 0; i < results.size(); i++)
     {
         auto &det = results[i];
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
@@ -179,9 +203,12 @@ void base_model_release()
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
+    delete g_ctx.detection_track_filter;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
+    g_ctx.detection_track_filter = nullptr;
+
     g_ctx.initialized = false;
 
     printf("carpet_model_release finished");
