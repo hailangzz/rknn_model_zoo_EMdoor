@@ -29,6 +29,7 @@ typedef struct {
     std::vector<CameraCoordinate> add_edge_point_single_pixel_camera_coordinates;     // 新增边缘点的轮廓相机坐标值
     std::vector<std::vector<cv::Point>>  object_contours_mark_point;   // 存储轮廓点集
 
+
 } ObjectCameraDetectResult;
 
 

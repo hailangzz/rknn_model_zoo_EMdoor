@@ -3,7 +3,7 @@
 // 预测框置信度
 
 
-model_path=./model/liquid_seg_v1_rect_boxgain7_3588_960p.rknn
+model_path=./model/liquid_seg_v1_rect_3588_960p_0619.rknn
 input_width=960
 input_height=960
 
