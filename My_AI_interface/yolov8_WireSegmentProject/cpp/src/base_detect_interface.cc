@@ -1,5 +1,6 @@
 #include "base_detect_interface.h"
 #include "detect_context.h"
+#include "track_filter.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -21,6 +22,7 @@ bool base_model_init(const char *config_path)
 
     g_ctx.detector = new Detector(g_ctx.config);
     g_ctx.camera_params = new CameraParameters(g_ctx.config);
+    g_ctx.detection_track_filter = new TrackFilter(3, 2, 5, 120.0f, 2.5f);
 
     g_ctx.initialized = true;
 
@@ -143,35 +145,41 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
 
         fillCameraDetectResult(det, one, g_ctx.config); // 结果值填充
 
-        // // 安全打印
-        // auto &coord = det->camera_coordinates;
-        // printf("Left Bottom: X=%f Y=%f Z=%f\n",
-        //     coord.left_bottom.X, coord.left_bottom.Y, coord.left_bottom.Z);
-        // printf("Right Bottom: X=%f Y=%f Z=%f\n",
-        //     coord.right_bottom.X, coord.right_bottom.Y, coord.right_bottom.Z);
-        // printf("Right Top: X=%f Y=%f Z=%f\n",
-        //     coord.right_top.X, coord.right_top.Y, coord.right_top.Z);
-        // printf("Left Top: X=%f Y=%f Z=%f\n",
-        //     coord.left_top.X, coord.left_top.Y, coord.left_top.Z);
-        // printf("%d\n", det->box.left);
-        // printf("%d\n", det->box.top);
-        // printf("%d\n", det->box.right);
-        // printf("%d\n", det->box.bottom);
+        if (!isEdgePointValid(one, 2.5f, 5)) // 过滤掉边缘点超过 2.5 米，或者边缘点数量小于 5 的目标（剔除远距离误检目标）
+        {
+            continue;
+        }
+        // printf("Valid edge points: %zu\n", one.add_edge_point_single_pixel_camera_coordinates.size());
 
-        results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
-
-        // 边框合法性校验：
+        // 边框合法性校验：过滤掉宽、高小于10厘米的目标
         ObjectSize3D size;
-        if (calcObjectSizeByAverage(one, size))
+        float min_width = 0.03f;  // 0.03cm 非常近时，线材的宽度、可能会有等于线宽的情况
+        float min_height = 0.03f; // 0.03cm
+        if (!calcObjectSizeByAverage(one, size, min_width, min_height))
         {
             // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
+            continue;
         }
+
+        results.push_back(one); // 将处理好的所有结果信息，存储到输出数组中，返回给调用方。
     }
+    //--------------------------------------
+    // 时序滤波,过滤掉瞬间误检，及瞬间漏检目标（注意：此功能要防止干扰样本采集）
+    //--------------------------------------
+
+    std::vector<ObjectCameraDetectResult> track_filtered_results;
+
+    g_ctx.detection_track_filter->update(
+        results,
+        track_filtered_results);
+    results.swap(track_filtered_results);
+
+    // 后面继续使用 results
 
     // 调试输出
     // 打印总数量
     printf("od_results.count: %d\n", od_results.count);
-    for (int i = 0; i < od_results.count; i++)
+    for (size_t i = 0; i < results.size(); i++)
     {
         auto &det = results[i];
         printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
@@ -200,9 +208,12 @@ void base_model_release()
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
+    delete g_ctx.detection_track_filter;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
+    g_ctx.detection_track_filter = nullptr;
+
     g_ctx.initialized = false;
 
     printf("carpet_model_release finished");

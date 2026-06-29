@@ -467,28 +467,52 @@ static inline float distance3D(const CameraCoordinate& a, const CameraCoordinate
 }
 
 // 计算物体宽度、高度
-bool calcObjectSizeByAverage(ObjectCameraDetectResult& one,ObjectSize3D& size_out)
+bool calcObjectSizeByAverage(
+    ObjectCameraDetectResult &one,
+    ObjectSize3D &size_out,
+    float min_width,
+    float min_height)
 {
     // 四个顶点
-    const CameraCoordinate& lt = one.coords[0]; // left_top
-    const CameraCoordinate& rt = one.coords[1]; // right_top
-    const CameraCoordinate& rb = one.coords[2]; // right_bottom
-    const CameraCoordinate& lb = one.coords[3]; // left_bottom
+    const CameraCoordinate &lt = one.coords[0];
+    const CameraCoordinate &rt = one.coords[1];
+    const CameraCoordinate &rb = one.coords[2];
+    const CameraCoordinate &lb = one.coords[3];
 
     // 宽度（上边 & 下边）
-    float width_top    = distance3D(lt, rt);
+    float width_top = distance3D(lt, rt);
     float width_bottom = distance3D(lb, rb);
 
     // 高度（左边 & 右边）
-    float height_left  = distance3D(lt, lb);
+    float height_left = distance3D(lt, lb);
     float height_right = distance3D(rt, rb);
 
     // 平均
-    size_out.width  = (width_top + width_bottom) * 0.5f;
+    size_out.width = (width_top + width_bottom) * 0.5f;
     size_out.height = (height_left + height_right) * 0.5f;
 
+    //----------------------------------
     // 基本合法性检查
-    if (size_out.width <= 0.0f || size_out.height <= 0.0f) {
+    //----------------------------------
+    if (size_out.width <= 0.0f ||
+        size_out.height <= 0.0f)
+    {
+        return false;
+    }
+
+    //----------------------------------
+    // 尺寸过滤（单位：米）
+    //----------------------------------
+    float MIN_WIDTH = min_width;   // 20cm
+    float MIN_HEIGHT = min_height; // 20cm
+
+    if (size_out.width < MIN_WIDTH ||
+        size_out.height < MIN_HEIGHT)
+    {
+        printf("object too small: width=%.3f height=%.3f\n",
+               size_out.width,
+               size_out.height);
+
         return false;
     }
 

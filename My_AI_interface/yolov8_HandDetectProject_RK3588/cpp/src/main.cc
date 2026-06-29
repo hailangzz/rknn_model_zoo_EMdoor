@@ -26,22 +26,19 @@
 #include "image_drawing.h"
 #include "hand_detect_interface.h"
 
-#if defined(RV1106_1103) 
-    #include "dma_alloc.hpp"
+#if defined(RV1106_1103)
+#include "dma_alloc.hpp"
 #endif
 
 #include <sys/time.h>
 
-
 double __get_us(struct timeval t) { return (t.tv_sec * 1000000 + t.tv_usec); }
 
-
-
 // helper: RGB -> NV21
-void RGBToNV21(const uint8_t* rgb, int width, int height, uint8_t* nv21)
+void RGBToNV21(const uint8_t *rgb, int width, int height, uint8_t *nv21)
 {
-    uint8_t* y_plane = nv21;
-    uint8_t* vu_plane = nv21 + width * height;
+    uint8_t *y_plane = nv21;
+    uint8_t *vu_plane = nv21 + width * height;
 
     int frame_size = width * height;
 
@@ -55,17 +52,17 @@ void RGBToNV21(const uint8_t* rgb, int width, int height, uint8_t* nv21)
             uint8_t b = rgb[rgb_index + 2];
 
             // 标准 YUV 转换公式
-            uint8_t y = (uint8_t)(( 66*r + 129*g + 25*b + 128) >> 8) + 16;
-            uint8_t u = (uint8_t)((-38*r - 74*g + 112*b + 128) >> 8) + 128;
-            uint8_t v = (uint8_t)((112*r - 94*g - 18*b + 128) >> 8) + 128;
+            uint8_t y = (uint8_t)((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
+            uint8_t u = (uint8_t)((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
+            uint8_t v = (uint8_t)((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
 
-            y_plane[j*width + i] = y;
+            y_plane[j * width + i] = y;
 
             // 只在偶数行偶数列采样 UV
             if ((j % 2 == 0) && (i % 2 == 0))
             {
-                int vu_index = (j/2)*width + i;
-                vu_plane[vu_index]     = v;
+                int vu_index = (j / 2) * width + i;
+                vu_plane[vu_index] = v;
                 vu_plane[vu_index + 1] = u;
             }
         }
@@ -73,103 +70,113 @@ void RGBToNV21(const uint8_t* rgb, int width, int height, uint8_t* nv21)
 }
 
 // helper: RGBA -> NV21
-void RGBAToNV21(const uint8_t* rgba, int width, int height, uint8_t* nv21)
+void RGBAToNV21(const uint8_t *rgba, int width, int height, uint8_t *nv21)
 {
-    uint8_t* rgb = new uint8_t[width * height * 3];
+    uint8_t *rgb = new uint8_t[width * height * 3];
     for (int i = 0; i < width * height; i++)
     {
-        rgb[i*3 + 0] = rgba[i*4 + 0];
-        rgb[i*3 + 1] = rgba[i*4 + 1];
-        rgb[i*3 + 2] = rgba[i*4 + 2];
+        rgb[i * 3 + 0] = rgba[i * 4 + 0];
+        rgb[i * 3 + 1] = rgba[i * 4 + 1];
+        rgb[i * 3 + 2] = rgba[i * 4 + 2];
     }
     RGBToNV21(rgb, width, height, nv21);
     delete[] rgb;
 }
 
 // helper: NV12 -> NV21 (只需要交换 U/V)
-void NV12ToNV21(const uint8_t* nv12, int width, int height, uint8_t* nv21)
+void NV12ToNV21(const uint8_t *nv12, int width, int height, uint8_t *nv21)
 {
     int frame_size = width * height;
     memcpy(nv21, nv12, frame_size); // 拷贝 Y
 
-    const uint8_t* uv = nv12 + frame_size;
-    uint8_t* vu = nv21 + frame_size;
+    const uint8_t *uv = nv12 + frame_size;
+    uint8_t *vu = nv21 + frame_size;
 
     for (int i = 0; i < frame_size / 2; i += 2)
     {
-        vu[i]   = uv[i+1]; // V
-        vu[i+1] = uv[i];   // U
+        vu[i] = uv[i + 1]; // V
+        vu[i + 1] = uv[i]; // U
     }
 }
-
-
 
 void PrintHandDetectResult(HandDetectResult result)
 {
-    switch(result)
+    switch (result)
     {
-        case HandDetectResult::Processing:  std::cout << "Processing"; break;
-        case HandDetectResult::NoHand:      std::cout << "NoHand"; break;
-        case HandDetectResult::HandDetected: std::cout << "HandDetected"; break;
-        default: std::cout << "Unknown"; break;
+    case HandDetectResult::Processing:
+        std::cout << "Processing";
+        break;
+    case HandDetectResult::NoHand:
+        std::cout << "NoHand";
+        break;
+    case HandDetectResult::HandDetected:
+        std::cout << "HandDetected";
+        break;
+    default:
+        std::cout << "Unknown";
+        break;
     }
 }
 
-bool ConvertImageBufferToRGB(const image_buffer_t& src,
-                             std::shared_ptr<cv::Mat>& mat_image_input)
+bool ConvertImageBufferToRGB(const image_buffer_t &src,
+                             std::shared_ptr<cv::Mat> &mat_image_input)
 {
     // 1️⃣ 检查输入
-    if (!src.virt_addr || src.width <= 0 || src.height <= 0) {
+    if (!src.virt_addr || src.width <= 0 || src.height <= 0)
+    {
         return false;
     }
 
-    int width  = src.width;
+    int width = src.width;
     int height = src.height;
 
     // 2️⃣ 创建 Mat（RGB888 → CV_8UC3）
     mat_image_input = std::make_shared<cv::Mat>(height, width, CV_8UC3);
-    if (!mat_image_input || mat_image_input->empty()) {
+    if (!mat_image_input || mat_image_input->empty())
+    {
         return false;
     }
 
-    uint8_t* rgb = mat_image_input->data;
+    uint8_t *rgb = mat_image_input->data;
 
     switch (src.format)
     {
-        case IMAGE_FORMAT_GRAY8:
+    case IMAGE_FORMAT_GRAY8:
+    {
+        // Gray → RGB
+        for (int i = 0; i < width * height; ++i)
         {
-            // Gray → RGB
-            for (int i = 0; i < width * height; ++i) {
-                uint8_t gray = src.virt_addr[i];
-                rgb[i * 3 + 0] = gray;
-                rgb[i * 3 + 1] = gray;
-                rgb[i * 3 + 2] = gray;
-            }
-            break;
+            uint8_t gray = src.virt_addr[i];
+            rgb[i * 3 + 0] = gray;
+            rgb[i * 3 + 1] = gray;
+            rgb[i * 3 + 2] = gray;
         }
+        break;
+    }
 
-        case IMAGE_FORMAT_RGB888:
+    case IMAGE_FORMAT_RGB888:
+    {
+        // 直接拷贝
+        memcpy(rgb, src.virt_addr, width * height * 3);
+        break;
+    }
+
+    case IMAGE_FORMAT_RGBA8888:
+    {
+        // RGBA → RGB
+        const uint8_t *rgba = src.virt_addr;
+        for (int i = 0; i < width * height; ++i)
         {
-            // 直接拷贝
-            memcpy(rgb, src.virt_addr, width * height * 3);
-            break;
+            rgb[i * 3 + 0] = rgba[i * 4 + 0];
+            rgb[i * 3 + 1] = rgba[i * 4 + 1];
+            rgb[i * 3 + 2] = rgba[i * 4 + 2];
         }
+        break;
+    }
 
-        case IMAGE_FORMAT_RGBA8888:
-        {
-            // RGBA → RGB
-            const uint8_t* rgba = src.virt_addr;
-            for (int i = 0; i < width * height; ++i) {
-                rgb[i * 3 + 0] = rgba[i * 4 + 0];
-                rgb[i * 3 + 1] = rgba[i * 4 + 1];
-                rgb[i * 3 + 2] = rgba[i * 4 + 2];
-            }
-            break;
-        }
-
-        default:
-            mat_image_input.reset();
-            return false;
+    default:
+        mat_image_input.reset();
+        return false;
     }
 
     return true;
@@ -193,12 +200,14 @@ int main(int argc, char **argv)
     // write_image("origin.png", &src_image);
 
     std::shared_ptr<cv::Mat> mat_img;
-    if (!ConvertImageBufferToRGB(src_image, mat_img)) {
+    if (!ConvertImageBufferToRGB(src_image, mat_img))
+    {
         std::cerr << "Convert failed\n";
         return -1;
     }
 
-    if (mat_img->empty()) {
+    if (mat_img->empty())
+    {
         std::cerr << "❌ Failed to read image\n";
         return -1;
     }
@@ -206,16 +215,17 @@ int main(int argc, char **argv)
     // 转换为 RGB
     // auto img_rgb = std::make_shared<cv::Mat>();
     // cv::cvtColor(*mat_img, *img_rgb, cv::COLOR_BGR2RGB);
+    // HandDetectResult results = hand_detect_interface(mat_img, HandDetectCameraInfo::TopHandCamera, true);
     HandDetectResult results = hand_detect_interface(mat_img, HandDetectCameraInfo::BottomHandCamera, true);
-    
+
     std::cout << "HandDetect result: ";
     PrintHandDetectResult(results);
     std::cout << std::endl;
 
 #if defined(RV1106_1103)
-    //RV1106 rga requires that input and output bufs are memory allocated by dma
-    ret = dma_buf_alloc(RV1106_CMA_HEAP_PATH, src_image.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd, 
-                       (void **) & (rknn_app_ctx.img_dma_buf.dma_buf_virt_addr));
+    // RV1106 rga requires that input and output bufs are memory allocated by dma
+    ret = dma_buf_alloc(RV1106_CMA_HEAP_PATH, src_image.size, &rknn_app_ctx.img_dma_buf.dma_buf_fd,
+                        (void **)&(rknn_app_ctx.img_dma_buf.dma_buf_virt_addr));
     memcpy(rknn_app_ctx.img_dma_buf.dma_buf_virt_addr, src_image.virt_addr, src_image.size);
     dma_sync_cpu_to_device(rknn_app_ctx.img_dma_buf.dma_buf_fd);
     free(src_image.virt_addr);
@@ -223,7 +233,7 @@ int main(int argc, char **argv)
     src_image.fd = rknn_app_ctx.img_dma_buf.dma_buf_fd;
     rknn_app_ctx.img_dma_buf.size = src_image.size;
 #endif
-    
+
     object_detect_result_list od_results;
 
     // 计算耗时
@@ -238,7 +248,7 @@ int main(int argc, char **argv)
 
     gettimeofday(&stop_time, NULL);
     printf("once run use %f ms\n", (__get_us(stop_time) - __get_us(start_time)) / 1000);
-    
+
     // 画框和概率
     char text[256];
     for (int i = 0; i < od_results.count; i++)
@@ -248,14 +258,14 @@ int main(int argc, char **argv)
                det_result->box.left, det_result->box.top,
                det_result->box.right, det_result->box.bottom,
                det_result->prop);
-        
+
         int x1 = det_result->box.left;
         int y1 = det_result->box.top;
         int x2 = det_result->box.right;
         int y2 = det_result->box.bottom;
 
         draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
-        
+
         printf("finish draw_rectangle!!!!! \n");
         // camera_parameters.ObjectboxToCameraXYZ(od_results.results[i].box, od_results.results[i].camera_coordinates);
         // camera_parameters.ObjectboxToCameraXYZ(det_result->box, det_result->camera_coordinates);
