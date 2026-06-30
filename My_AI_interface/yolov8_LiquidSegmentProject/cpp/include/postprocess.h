@@ -16,7 +16,7 @@
 #define OBJ_NUMB_MAX_SIZE 128
 #define OBJ_CLASS_NUM 1
 #define NMS_THRESH 0.45
-#define BOX_THRESH 0.35
+#define BOX_THRESH 0.45
 #define PROP_BOX_SIZE (5 + OBJ_CLASS_NUM)
 
 #define PROTO_CHANNEL 32
@@ -33,11 +33,12 @@
 
 // class rknn_app_context_t;
 
-typedef struct {
+typedef struct
+{
     image_rect_t box;
     float prop;
     int cls_id;
-    box_camera_coordinates camera_coordinates;   //新增相机坐标信息
+    box_camera_coordinates camera_coordinates; // 新增相机坐标信息
 
 } object_detect_result;
 
@@ -46,13 +47,13 @@ typedef struct
     uint8_t *seg_mask;
 } object_segment_result;
 
-typedef struct {
+typedef struct
+{
     int id;
     int count;
     object_detect_result results[OBJ_NUMB_MAX_SIZE];
     object_segment_result results_seg[OBJ_NUMB_MAX_SIZE];
 } object_detect_result_list;
-
 
 int init_post_process();
 void deinit_post_process();
@@ -66,17 +67,17 @@ void deinit_post_process();
 //                                std::vector<std::vector<cv::Point>> &out_contours);
 
 void extract_seg_mask_contours(
-    object_segment_result* seg,       // 只操作单个目标的 seg_mask
+    object_segment_result *seg, // 只操作单个目标的 seg_mask
     int width,
     int height,
     std::vector<std::vector<cv::Point>> &out_contours);
 
 void smoothContour(
-    const std::vector<cv::Point>& input,
-    std::vector<cv::Point>& output,
+    const std::vector<cv::Point> &input,
+    std::vector<cv::Point> &output,
     int win = 3);
 
-void fillCameraDetectResult(const object_detect_result* det, ObjectCameraDetectResult& one, ConfigInfo & config);
+void fillCameraDetectResult(const object_detect_result *det, ObjectCameraDetectResult &one, ConfigInfo &config);
 
 void filter_mask_contours(const std::vector<std::vector<cv::Point>> &input_contours,std::vector<std::vector<cv::Point>> &output_contours);
 // bool isEdgePointValid(const ObjectCameraDetectResult& one, float max_dist); 

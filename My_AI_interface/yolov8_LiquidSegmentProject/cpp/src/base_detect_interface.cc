@@ -107,7 +107,10 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
     // ================= 统计 =================
     float box_max_prop = std::numeric_limits<float>::lowest();
 
-    // ================= 处理结果 =================
+    // 目标的所有轮廓点集数组
+    std::vector<std::vector<cv::Point>> debug_all_contours;
+    std::vector<int> debug_all_cls_ids;
+    // 遍历检测结果
     for (int i = 0; i < od_results.count; i++)
     {
 
@@ -173,13 +176,32 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
         }
 
         results.push_back(one);
+
+	for (const auto &contour : contours_mark_point_filtered)
+        {
+            debug_all_contours.push_back(contour);
+            debug_all_cls_ids.push_back(det->cls_id);
+        }
+
+        // 边框合法性校验：
+        ObjectSize3D size;
+        if (calcObjectSizeByAverage(one, size))
+        {
+            // printf("Object size: width=%.3f m, height=%.3f m\n", size.width, size.height);
+        }
     }
 
-    // ================= Debug 保存 =================
-    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold)
-    {
-        g_ctx.debuger->saveIfDetected(img, "liquid_detect");
-    }
+    //// ================= Debug 保存 =================
+    // if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold)
+    // {
+    //     g_ctx.debuger->saveIfDetected(img, "liquid_detect");
+    // }
+
+    g_ctx.debuger->saveIfDetectedAddContours(
+        img,
+        debug_all_contours,
+        debug_all_cls_ids,
+        "carpet_detect");
 
     // ================= Debug 输出 =================
     printf("od_results.count: %d\n", od_results.count);
@@ -220,9 +242,11 @@ void base_model_release()
 
     delete g_ctx.detector;
     delete g_ctx.camera_params;
+    delete g_ctx.debuger;
 
     g_ctx.detector = nullptr;
     g_ctx.camera_params = nullptr;
+    g_ctx.debuger = nullptr;
     g_ctx.initialized = false;
 
     printf("carpet_model_release finished\n");
