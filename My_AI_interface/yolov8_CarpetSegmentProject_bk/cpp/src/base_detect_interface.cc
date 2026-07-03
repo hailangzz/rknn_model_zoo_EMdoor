@@ -98,10 +98,7 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
     // ================= 统计 =================
     float box_max_prop = std::numeric_limits<float>::lowest();
 
-    // 目标的所有轮廓点集数组
-    std::vector<std::vector<cv::Point>> debug_all_contours;
-    std::vector<int> debug_all_cls_ids;
-    // 遍历检测结果
+    // ================= 遍历检测结果 =================
     for (int i = 0; i < od_results.count; i++)
     {
 
@@ -118,17 +115,17 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
         box_max_prop = std::max(box_max_prop, det->prop);
 
         // ---------- 阈值过滤 ----------
-        // if (det->prop < g_ctx.config.score_threshold)
-        // {
-        //     continue;
-        // }
+        if (det->prop < g_ctx.config.score_threshold)
+        {
+            continue;
+        }
 
         // ---------- seg 安全 ----------
-        // if (!od_results.results_seg)
-        // {
-        //     printf("results_seg is null!\n");
-        //     continue;
-        // }
+        if (!od_results.results_seg)
+        {
+            printf("results_seg is null!\n");
+            continue;
+        }
 
         object_segment_result *seg = &od_results.results_seg[i];
         if (!seg)
@@ -174,31 +171,25 @@ bool base_detect_infer(const cv::Mat &img, std::vector<ObjectCameraDetectResult>
 
         results.push_back(one);
 
-	for (const auto &contour : contours_filtered)
-        {
-            debug_all_contours.push_back(contour);
-            debug_all_cls_ids.push_back(det->cls_id);
-        }
-
-
         // ---------- 尺寸计算 ----------
         ObjectSize3D size;
         calcObjectSizeByAverage(one, size);
     }
 
-    g_ctx.debuger->saveIfDetectedAddContours(
-        img,
-        debug_all_contours,
-        debug_all_cls_ids,
-        "carpet_detect");
-
-    // 调试输出
-    // 打印总数量
-    printf("od_results.count: %d\n", od_results.count);
-    for (int i = 0; i < od_results.count; i++)
+    // ================= Debug 保存 =================
+    if (g_ctx.debuger && box_max_prop > g_ctx.config.debug_score_threshold)
     {
-        auto &det = results[i];
-        printf("det.cls_id:%d, det.prop:%f\n", det.cls_id, det.prop);
+        g_ctx.debuger->saveIfDetected(img, "carpet_detect");
+    }
+
+    // ================= Debug 输出 =================
+    printf("od_results.count: %d\n", od_results.count);
+
+    for (size_t i = 0; i < results.size(); i++)
+    {
+        printf("det.cls_id:%d, det.prop:%f\n",
+               results[i].cls_id,
+               results[i].prop);
     }
 
     // ================= 释放 seg_mask（⚠️需确认） =================

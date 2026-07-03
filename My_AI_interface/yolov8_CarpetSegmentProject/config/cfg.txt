@@ -5,7 +5,7 @@
 model_path=./model/carpet_f_seg_v10.rknn
 input_width=640
 input_height=640
-score_threshold=0.5f
+score_threshold=0.7f
 
 //检测帧数阈值
 max_frame_threshold=3
