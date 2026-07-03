@@ -2,9 +2,9 @@
 
 /* ================= main ================= */
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "base_detect_ros_node");
+    ros::init(argc, argv, "carpet_detect_ros_node");
     ros::NodeHandle nh;
 
     try
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
         node.create_infer_thread();
         ros::spin();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         ROS_FATAL("Exception: %s", e.what());
     }

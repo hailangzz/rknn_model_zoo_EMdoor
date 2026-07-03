@@ -12,7 +12,7 @@ score_threshold=0.4f
 max_frame_threshold=3
 
 //BASE的类别ID，于建图配合，设定BASE目标的重要程度
-BASE_AREA=201
+BASE_AREA=151
 
 //相机坐标系：远端Z轴比例缩放
 camera_z_axle_top_resize_rate=1.0
