@@ -7,7 +7,7 @@
 #include "image_drawing.h"
 #include "map.h"
 
-static DetectContext g_ctx; // 全局上下文实例
+static DetectContext g_ctx;
 
 bool base_model_init(const char *config_path)
 {
@@ -46,14 +46,17 @@ bool real_detect_infer(
     // 安全检查
     // ========================================================
 
-    if (!g_ctx.initialized || img.empty())
+    if (!g_ctx.initialized ||
+        !g_ctx.detector ||
+        !g_ctx.camera_params ||
+        img.empty())
     {
         printf("model not initialized or empty image\n");
         return false;
     }
 
     // ========================================================
-    // 图像格式处理
+    // Mat处理
     // ========================================================
 
     cv::Mat img_rgb;
@@ -77,7 +80,6 @@ bool real_detect_infer(
         img_rgb = img;
     }
 
-    // 保证连续内存
     if (!img_rgb.isContinuous())
     {
         img_rgb = img_rgb.clone();
@@ -98,7 +100,6 @@ bool real_detect_infer(
         img_rgb.total() *
         img_rgb.elemSize();
 
-    // 64字节对齐
     if (posix_memalign(
             (void **)&src_image.virt_addr,
             64,
@@ -108,20 +109,22 @@ bool real_detect_infer(
         return false;
     }
 
-    memset(
-        src_image.virt_addr,
-        0,
-        buffer_size);
-
     memcpy(
         src_image.virt_addr,
         img_rgb.data,
         buffer_size);
 
-    src_image.width = img_rgb.cols;
-    src_image.height = img_rgb.rows;
-    src_image.format = IMAGE_FORMAT_RGB888;
-    src_image.size = buffer_size;
+    src_image.width =
+        img_rgb.cols;
+
+    src_image.height =
+        img_rgb.rows;
+
+    src_image.format =
+        IMAGE_FORMAT_RGB888;
+
+    src_image.size =
+        buffer_size;
 
     // ========================================================
     // 推理
@@ -132,7 +135,7 @@ bool real_detect_infer(
     memset(
         &od_results,
         0,
-        sizeof(object_detect_result_list));
+        sizeof(od_results));
 
     int ret =
         g_ctx.detector->inference_yolov8_model(
@@ -144,7 +147,6 @@ bool real_detect_infer(
         printf("yolov8 inference failed\n");
 
         free(src_image.virt_addr);
-        src_image.virt_addr = nullptr;
 
         return false;
     }
@@ -152,11 +154,13 @@ bool real_detect_infer(
     // 数据回传时，调试信息里的mark轮廓和类别id也一并回传，主要用于分析空间位置符合条件时，检测结果的有效性，以及空间位置不符合条件时，是否存在高置信度的检测结果
     std::vector<std::vector<cv::Point>> debug_all_contours;
     std::vector<int> debug_all_cls_ids;
+
     // ========================================================
     // 统计
     // ========================================================
 
-    float box_max_prop = 0.f;
+    // float box_max_prop = std::numeric_limits<float>::lowest();
+    float box_max_prop = 0.0f;
 
     // ========================================================
     // 遍历检测结果
@@ -164,17 +168,15 @@ bool real_detect_infer(
 
     for (int i = 0; i < od_results.count; i++)
     {
-        // 安全检查
         if (!od_results.results)
         {
-            printf("od_results.results is null\n");
+            printf("results is null!\n");
             break;
         }
 
         object_detect_result *det =
             &od_results.results[i];
 
-        // 更新最大置信度
         box_max_prop =
             std::max(
                 box_max_prop,
@@ -187,61 +189,62 @@ bool real_detect_infer(
             continue;
         }
 
-        // seg 检查
         if (!od_results.results_seg)
         {
-            printf("od_results.results_seg is null\n");
+            printf("results_seg is null!\n");
             continue;
         }
 
         object_segment_result *seg =
             &od_results.results_seg[i];
 
-        if (!seg || !seg->seg_mask)
+        if (!seg)
         {
-            printf("seg or seg_mask invalid\n");
+            printf("seg ptr invalid!\n");
             continue;
         }
 
         ObjectCameraDetectResult one;
 
-        std::vector<std::vector<cv::Point>> contours_mark_point;
-        std::vector<std::vector<cv::Point>> contours_mark_point_filtered;
-        std::vector<std::vector<cv::Point>> contours_mark_point_smoothed;
+        std::vector<std::vector<cv::Point>> contours;
+
+        std::vector<std::vector<cv::Point>> contours_filtered;
+
+        std::vector<std::vector<cv::Point>> contours_smoothed;
 
         // ====================================================
-        // 提取 mask 轮廓
+        // 提取轮廓
         // ====================================================
 
         extract_seg_mask_contours(
             seg,
             src_image.width,
             src_image.height,
-            contours_mark_point);
+            contours);
 
         // ====================================================
         // 过滤轮廓
         // ====================================================
 
         filter_mask_contours(
-            contours_mark_point,
-            contours_mark_point_filtered);
+            contours,
+            contours_filtered);
 
         // ====================================================
         // 平滑轮廓
         // ====================================================
 
-        contours_mark_point_smoothed.resize(
-            contours_mark_point_filtered.size());
+        contours_smoothed.resize(
+            contours_filtered.size());
 
         for (size_t j = 0;
-             j < contours_mark_point_filtered.size();
+             j < contours_filtered.size();
              j++)
         {
             // 局部凸包平滑
             smoothContourOuterOnly(
-                contours_mark_point_filtered[j],
-                contours_mark_point_smoothed[j]);
+                contours_filtered[j],
+                contours_smoothed[j]);
         }
 
         // ====================================================
@@ -249,11 +252,7 @@ bool real_detect_infer(
         // ====================================================
 
         one.object_contours_mark_point =
-            contours_mark_point_filtered;
-
-        // ====================================================
-        // 初始化相机坐标
-        // ====================================================
+            contours_filtered;
 
         memset(
             &det->camera_coordinates,
@@ -261,12 +260,12 @@ bool real_detect_infer(
             sizeof(box_camera_coordinates));
 
         // ====================================================
-        // 坐标转换
+        // 转换相机坐标
         // ====================================================
 
         g_ctx.camera_params->ObjectboxToCameraXYZ(
             det,
-            contours_mark_point_smoothed);
+            contours_smoothed);
 
         // ====================================================
         // 填充结果
@@ -277,14 +276,10 @@ bool real_detect_infer(
             one,
             g_ctx.config);
 
-        // ====================================================
-        // 存储结果
-        // ====================================================
-
         results.push_back(one);
 
         // 写入调试信息里的mark轮廓和类别id，主要用于分析空间位置符合条件时，检测结果的有效性
-        for (const auto &contour : contours_mark_point_smoothed)
+        for (const auto &contour : contours_smoothed)
         {
             debug_all_contours.push_back(contour);
             debug_all_cls_ids.push_back(det->cls_id);
@@ -295,7 +290,7 @@ bool real_detect_infer(
         // ====================================================
 
         ObjectSize3D size;
-
+        // 进行尺寸计算，主要用于过滤掉一些不合理的检测结果（例如过大或过小的区域），以及为后续的跟踪和分析提供尺寸信息
         calcObjectSizeByAverage(
             one,
             size);
@@ -305,73 +300,39 @@ bool real_detect_infer(
     // Debug保存
     // ========================================================
 
-    if (g_ctx.debuger)
+    if (g_ctx.debuger) // 调试模式下
     {
-        if (g_ctx.g_pose_sampler->IsPoseSaveImage)
+        if (g_ctx.g_pose_sampler->IsPoseSaveImage) // 空间位置符合条件
         {
-            bool is_useful_prop =
-                box_max_prop >
-                g_ctx.config.score_threshold;
-
-            g_ctx.debuger->updateSavedPoseImageCount(
-                is_useful_prop);
-
-            if (is_useful_prop)
+            // target_status: 判断当前图像的目标状态
+            TargetStatus target_status;
+            if (box_max_prop > g_ctx.config.score_threshold)
             {
-                std::string save_name =
-                    "wire_detect_exist_target_" +
-                    std::to_string(
-                        g_ctx.debuger->getSavedPoseImageCount(
-                            is_useful_prop));
-                // // 仅保存存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     save_name);
-
-                if (!debug_all_contours.empty())
-                {
-                    g_ctx.debuger->saveSegLabel(
-                        img,
-                        debug_all_contours,
-                        debug_all_cls_ids,
-                        save_name);
-                }
+                target_status = TargetStatus::EXISTS;
+            }
+            else if (box_max_prop > g_ctx.config.debug_score_threshold)
+            {
+                target_status = TargetStatus::MIDDLE;
             }
             else
             {
-                std::string save_name =
-                    "wire_detect_null_target_" +
-                    std::to_string(
-                        g_ctx.debuger->getSavedPoseImageCount(
-                            is_useful_prop));
-                // // 仅保存不存在目标的图像，主要用于分析空间位置符合条件时，检测结果的有效性
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     save_name);
-
-                g_ctx.debuger->saveSegLabel(
-                    img,
-                    debug_all_contours,
-                    debug_all_cls_ids,
-                    save_name);
+                // 由于在yolov8_detect中BOX_THRESH设置为0.35，因此此处confidence已被过滤掉，一直为0，所以当置信度较低时，直接归为NONE状态
+                target_status = TargetStatus::NONE;
             }
-        }
-        else
-        {
-            if (box_max_prop >
-                g_ctx.config.debug_score_threshold)
-            {
-                // // 仅保存空间位置不符合条件，但置信度较高的图像，主要用于分析空间位置不符合条件时，是否存在高置信度的检测结果
-                // g_ctx.debuger->saveIfDetected(
-                //     img,
-                //     "carpet_detect");
 
-                g_ctx.debuger->saveSegLabel(
-                    img,
-                    debug_all_contours,
-                    debug_all_cls_ids,
-                    "wire_detect");
-            }
+            g_ctx.debuger->updateSavedPoseImageCount(target_status); // 更新基于空间的，图像目标有效性计数
+
+            std::string task_name = "wire_detect";
+
+            std::string save_sample_info_string = g_ctx.debuger->set_ai_capture_save_info(g_ctx.debuger->device_id_sn, task_name, TargetStatusToStr(target_status), box_max_prop); // 设置AI自动化迭代的图像保存信息
+
+            g_ctx.debuger->saveSegLabel(
+                img,
+                debug_all_contours,
+                debug_all_cls_ids,
+                task_name,
+                save_sample_info_string,
+                target_status);
         }
     }
 
@@ -379,24 +340,16 @@ bool real_detect_infer(
     // Debug输出
     // ========================================================
 
-    printf(
-        "od_results.count: %d\n",
-        od_results.count);
-
-    printf(
-        "results.size(): %zu\n",
-        results.size());
+    printf("od_results.count: %d\n",
+           od_results.count);
 
     for (size_t i = 0;
          i < results.size();
          i++)
     {
-        auto &det = results[i];
-
-        printf(
-            "det.cls_id:%d, det.prop:%f\n",
-            det.cls_id,
-            det.prop);
+        printf("det.cls_id:%d, det.prop:%f\n",
+               results[i].cls_id,
+               results[i].prop);
     }
 
     // ========================================================
@@ -409,32 +362,22 @@ bool real_detect_infer(
              i < od_results.count;
              i++)
         {
-            auto &seg =
-                od_results.results_seg[i];
-
-            if (seg.seg_mask)
+            if (od_results.results_seg[i].seg_mask)
             {
-                // TODO:
-                // 确认 seg_mask 是否由 malloc 分配
-                // 如果不是 malloc 分配，
-                // 这里 free 会崩溃
+                free(
+                    od_results.results_seg[i].seg_mask);
 
-                free(seg.seg_mask);
-
-                seg.seg_mask = nullptr;
+                od_results.results_seg[i].seg_mask =
+                    nullptr;
             }
         }
     }
 
     // ========================================================
-    // 释放输入buffer
+    // 释放输入
     // ========================================================
 
-    if (src_image.virt_addr)
-    {
-        free(src_image.virt_addr);
-        src_image.virt_addr = nullptr;
-    }
+    free(src_image.virt_addr);
 
     return !results.empty();
 }
@@ -457,13 +400,14 @@ bool base_detect_infer(
         g_ctx.g_pose_sampler->NeedSaveFrame(
             position,
             q);
-
+    // 当空间位置状态，不符合图像存储条件时；
     if (!g_ctx.g_pose_sampler->IsPoseSaveImage)
     {
         g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_debug_images_path);
 
         printf("skip infer, duplicated pose area\n");
     }
+    // 当空间位置状态，符合图像存储条件时；
     else
     {
         g_ctx.debuger->setDebugImageSavePath(g_ctx.config.save_images_path_spatial_location_val);
@@ -472,7 +416,7 @@ bool base_detect_infer(
     // ========================================================
     // 调用原始推理
     // ========================================================
-
+    printf("Calling real_detect_infer\n");
     return real_detect_infer(
         img,
         results);
@@ -484,7 +428,9 @@ bool base_detect_infer(
 void base_model_release()
 {
     if (!g_ctx.initialized)
+    {
         return;
+    }
 
     deinit_post_process();
 
@@ -499,5 +445,5 @@ void base_model_release()
     g_ctx.g_pose_sampler = nullptr;
     g_ctx.initialized = false;
 
-    printf("carpet_model_release finished");
+    printf("carpet_model_release finished\n");
 }

@@ -62,6 +62,44 @@ static bool createDirectories(
     return true;
 }
 
+std::string Debug::getDeviceSN(const std::string &file_path)
+{
+    std::ifstream ifs(file_path);
+
+    if (!ifs.is_open())
+    {
+        return "";
+    }
+
+    std::string line;
+
+    while (std::getline(ifs, line))
+    {
+        auto pos = line.find("\"sn\"");
+
+        if (pos != std::string::npos)
+        {
+            auto colon = line.find(":");
+
+            auto first_quote =
+                line.find("\"", colon);
+
+            auto second_quote =
+                line.find("\"", first_quote + 1);
+
+            if (first_quote != std::string::npos &&
+                second_quote != std::string::npos)
+            {
+                return line.substr(
+                    first_quote + 1,
+                    second_quote - first_quote - 1);
+            }
+        }
+    }
+
+    return "";
+}
+
 // =====================================================
 // Constructor
 // =====================================================
@@ -100,6 +138,10 @@ Debug::Debug(
     {
         save_interval_ms_ = 0;
     }
+
+    // 获取设备SN码
+    device_id_sn =
+        getDeviceSN(produce_info_path_);
 }
 
 // =====================================================
@@ -288,39 +330,78 @@ void Debug::setDebugImageSavePath(const std::string &path)
     }
 }
 
-void Debug::updateSavedPoseImageCount(bool is_exist_target)
+void Debug::updateSavedPoseImageCount(TargetStatus status)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (is_exist_target)
+    switch (status)
     {
+    case TargetStatus::EXISTS:
         saved_pose_exist_target_image_count_++;
-    }
-    else
-    {
+        break;
+
+    case TargetStatus::MIDDLE:
+        // 可选：单独统计 middle
+        saved_pose_middle_target_image_count_++;
+        break;
+
+    case TargetStatus::NONE:
         saved_pose_null_target_image_count_++;
+        break;
+
+    default:
+        break;
     }
 }
 
-int Debug::getSavedPoseImageCount(bool is_exist_target)
+int Debug::getSavedPoseImageCount(TargetStatus status)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (is_exist_target)
+    switch (status)
     {
+    case TargetStatus::EXISTS:
         return saved_pose_exist_target_image_count_;
-    }
-    else
-    {
+
+    case TargetStatus::MIDDLE:
+        return saved_pose_middle_target_image_count_;
+
+    case TargetStatus::NONE:
         return saved_pose_null_target_image_count_;
+
+    default:
+        return 0;
     }
+}
+
+std::string Debug::buildSaveDirectory(
+    const std::string &task_name,
+    TargetStatus status)
+{
+    std::string today = getCurrentDate();
+
+    std::string sn =
+        device_id_sn.empty()
+            ? "unknown_sn"
+            : device_id_sn;
+
+    std::string save_dir =
+        debug_image_save_path_ + "/" +
+        task_name + "/" +
+        sn + "/" +
+        today + "/" +
+        TargetStatusToStr(status);
+
+    return save_dir;
 }
 
 void Debug::saveSegLabel(
     const cv::Mat &image,
     const std::vector<std::vector<cv::Point>> &contours,
     const std::vector<int> &cls_ids,
-    const std::string &tag)
+    const std::string &task_name,
+    const std::string &save_sample_info_string,
+    TargetStatus status)
 {
     // =================================================
     // 开关检查
@@ -363,18 +444,48 @@ void Debug::saveSegLabel(
     // =================================================
 
     std::lock_guard<std::mutex> lock(mutex_);
+    // =================================================
+    // 获取目录
+    // =================================================
+
+    std::string save_dir =
+        buildSaveDirectory(
+            task_name,
+            status);
+
+    // =================================================
+    // 创建目录
+    // =================================================
+
+    if (!createDirectoryRecursive(save_dir))
+    {
+        std::cerr
+            << "[Debug] create save dir failed: "
+            << save_dir
+            << std::endl;
+
+        return;
+    }
+
+    // =================================================
+    // 时间戳
+    // =================================================
+
+    int64_t timestamp_ms =
+        getCurrentTimestampMs();
 
     // =================================================
     // 文件名
     // =================================================
 
     std::string image_filename =
-        generateFileName(tag);
+        save_dir + "/" +
+        std::to_string(timestamp_ms) + "_" + save_sample_info_string +
+        ".jpg";
 
     std::string label_filename =
-        image_filename.substr(
-            0,
-            image_filename.find_last_of('.')) +
+        save_dir + "/" +
+        std::to_string(timestamp_ms) + "_" + save_sample_info_string +
         ".txt";
 
     // =================================================
@@ -526,4 +637,202 @@ void Debug::saveSegLabel(
         << "[Debug] seg label saved: "
         << label_filename
         << std::endl;
+}
+
+// 获取当前日期，格式为YYYYMMDD
+std::string Debug::getCurrentDate()
+{
+    auto now = std::chrono::system_clock::now();
+
+    std::time_t now_time =
+        std::chrono::system_clock::to_time_t(now);
+
+    std::tm local_tm;
+
+    localtime_r(&now_time, &local_tm);
+
+    char buffer[16] = {0};
+
+    std::strftime(
+        buffer,
+        sizeof(buffer),
+        "%Y%m%d",
+        &local_tm);
+
+    return std::string(buffer);
+}
+// 递归创建目录
+bool Debug::createDirectoryRecursive(
+    const std::string &path)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+
+    // 已存在
+    struct stat st;
+
+    if (stat(path.c_str(), &st) == 0)
+    {
+        return S_ISDIR(st.st_mode);
+    }
+
+    std::string current_path;
+
+    for (size_t i = 0; i < path.size(); ++i)
+    {
+        current_path += path[i];
+
+        // 遇到 '/'
+        if (path[i] == '/')
+        {
+            if (current_path.empty())
+            {
+                continue;
+            }
+
+            if (stat(current_path.c_str(), &st) != 0)
+            {
+                if (mkdir(current_path.c_str(), 0755) != 0)
+                {
+                    if (errno != EEXIST)
+                    {
+                        std::cerr
+                            << "[Debug] mkdir failed: "
+                            << current_path
+                            << " errno="
+                            << errno
+                            << std::endl;
+
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    // 创建最后一级目录
+    if (stat(current_path.c_str(), &st) != 0)
+    {
+        if (mkdir(current_path.c_str(), 0755) != 0)
+        {
+            if (errno != EEXIST)
+            {
+                std::cerr
+                    << "[Debug] mkdir failed: "
+                    << current_path
+                    << " errno="
+                    << errno
+                    << std::endl;
+
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+// 删除过期目录
+void Debug::removeExpiredDirectories()
+{
+    DIR *dir = opendir(debug_image_save_path_.c_str());
+
+    if (dir == nullptr)
+    {
+        std::cerr << "open dir failed: "
+                  << debug_image_save_path_
+                  << std::endl;
+        return;
+    }
+
+    // 获取过期日期
+    auto now = std::chrono::system_clock::now();
+
+    auto expire_time =
+        now - std::chrono::hours(24 * keep_days_);
+
+    std::time_t expire_tt =
+        std::chrono::system_clock::to_time_t(expire_time);
+
+    std::tm expire_tm;
+
+    localtime_r(&expire_tt, &expire_tm);
+
+    char expire_date[16] = {0};
+
+    std::strftime(
+        expire_date,
+        sizeof(expire_date),
+        "%Y%m%d",
+        &expire_tm);
+
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != nullptr)
+    {
+        std::string dir_name = entry->d_name;
+
+        // 跳过 . 和 ..
+        if (dir_name == "." || dir_name == "..")
+        {
+            continue;
+        }
+
+        // 必须是8位日期目录
+        if (dir_name.size() != 8)
+        {
+            continue;
+        }
+
+        // 判断是否过期
+        if (dir_name < expire_date)
+        {
+            std::string full_path =
+                debug_image_save_path_ + "/" + dir_name;
+
+            std::cout << "remove expired dir: "
+                      << full_path
+                      << std::endl;
+
+            // 递归删除目录
+            std::string cmd =
+                "rm -rf " + full_path;
+
+            system(cmd.c_str());
+        }
+    }
+
+    closedir(dir);
+}
+
+int64_t Debug::getCurrentTimestampMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+std::string Debug::set_ai_capture_save_info(
+    const std::string &device_id_sn,
+    const std::string &model_task_type,
+    const std::string &target_status,
+    float confidence)
+{
+    float safe_confidence = std::max(0.0f, confidence);
+    ai_capture_save_info_.device_id_sn = device_id_sn;
+    ai_capture_save_info_.model_task_type = model_task_type;
+    ai_capture_save_info_.has_target = target_status;
+    ai_capture_save_info_.confidence = confidence;
+
+    std::ostringstream oss;
+    // confidence 保留三位小数
+    oss << device_id_sn
+        << "_" << model_task_type
+        << "_" << target_status
+        << "_" << std::fixed
+        << std::setprecision(3)
+        << safe_confidence;
+
+    return oss.str();
 }
