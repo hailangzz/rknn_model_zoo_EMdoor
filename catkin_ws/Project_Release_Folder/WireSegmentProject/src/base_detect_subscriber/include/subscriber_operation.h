@@ -15,7 +15,7 @@
 class BaseDetectNode
 {
 public:
-    BaseDetectNode(ros::NodeHandle& nh);
+    BaseDetectNode(ros::NodeHandle &nh);
     ~BaseDetectNode();
 
     void create_infer_thread();
@@ -26,7 +26,7 @@ private:
     void poseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
 
     /* ============ 推理主循环 ============ */
-    void inferenceLoop();    
+    void inferenceLoop();
 
     /* ============ ROS 参数监控线程 ============ */
     void rosparamMonitorLoop();
@@ -34,8 +34,7 @@ private:
     /* ============ 资源释放 ============ */
     void shutdown();
 
-    void publishDebugImage(const cv::Mat& img,const std::vector<ObjectCameraDetectResult>& results,const std_msgs::Header& header);
-
+    void publishDebugImage(const cv::Mat &img, const std::vector<ObjectCameraDetectResult> &results, const std_msgs::Header &header);
 
     /* ============ ROS ============ */
     ros::NodeHandle nh_;
@@ -50,9 +49,9 @@ private:
     bool running_;
 
     /* ============ 检测功能开关 ============ */
-    bool infer_enable_;                     // 私有推理开关
-    const std::string infer_enable_param_ = "/task_manager/base_inspection_enable";  // ROS param 名
-    std::thread rosparam_monitor_thread_;  // 新增：监控开关参数线程
+    bool infer_enable_;                                                             // 私有推理开关
+    const std::string infer_enable_param_ = "/task_manager/wire_inspection_enable"; // ROS param 名
+    std::thread rosparam_monitor_thread_;                                           // 新增：监控开关参数线程
 
     /* ============ 图像缓冲 ============ */
     cv::Mat latest_frame_;
@@ -62,19 +61,18 @@ private:
     // ObjectCameraDetectResult camera_coordinates_results_[64]; // 最多存 64 个检测目标的相机坐标值
     std::vector<ObjectCameraDetectResult> camera_coordinates_results_;
 
-
     //  新增：检测结果发布器
     ros::Publisher detect_result_pub_;
-    const std::string detect_result_pub_topic_= "/camera_detect/object_camera_coordinates_results";
+    const std::string detect_result_pub_topic_ = "/camera_detect/object_camera_coordinates_results";
     // struct → msg 转换函数
-    void convertToMsg(const ObjectCameraDetectResult& src,base_detect_msgs::ObjectCameraDetectResult& dst);
+    void convertToMsg(const ObjectCameraDetectResult &src, base_detect_msgs::ObjectCameraDetectResult &dst);
 
     // 可视化图像发布器
     ros::Publisher debug_image_pub_;
-    const std::string debug_image_pub_topic_ =  "/camera_detect/object_camera_coordinates_image";
+    const std::string debug_image_pub_topic_ = "/camera_detect/object_camera_coordinates_image";
 
     // ros下坐标系标志
-    const std::string camera_coordinate_system_flag_= "color_camera_optical_link";
+    const std::string camera_coordinate_system_flag_ = "color_camera_optical_link";
 
     /* ============ Pose缓存（关键修复） ============ */
     geometry_msgs::PoseWithCovarianceStamped latest_pose_;

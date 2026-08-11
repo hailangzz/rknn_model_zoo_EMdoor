@@ -2,7 +2,7 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-model_path=./model/wire_f_v3_3588_960p.rknn
+model_path=./model/wire_f_v3_3588_960p_0615.rknn
 input_width=960
 input_height=960
 
@@ -43,4 +43,4 @@ debug_score_threshold=0.3f
 save_debug_images_path=/home/robot/share/AI_Program/WireSegmentProject/images
 save_images_path_spatial_location_val=/home/robot/share/AI_Program/WireSegmentProject/spatial_location_val_images
 is_save_debug_images=true
-fps_limit=5
+fps_limit=3

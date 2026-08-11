@@ -378,14 +378,17 @@ std::string Debug::buildSaveDirectory(
     const std::string &task_name,
     TargetStatus status)
 {
-    // 获取日期
-    std::string today =
-        getCurrentDate();
+    std::string today = getCurrentDate();
 
-    // root/task/YYYYMMDD/status
+    std::string sn =
+        device_id_sn.empty()
+            ? "unknown_sn"
+            : device_id_sn;
+
     std::string save_dir =
         debug_image_save_path_ + "/" +
         task_name + "/" +
+        sn + "/" +
         today + "/" +
         TargetStatusToStr(status);
 
