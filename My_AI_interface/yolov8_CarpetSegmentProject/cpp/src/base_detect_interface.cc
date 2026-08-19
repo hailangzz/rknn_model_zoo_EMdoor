@@ -25,6 +25,15 @@ bool base_model_init(const char *config_path)
 
     g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path, g_ctx.config.is_save_debug_images, g_ctx.config.fps_limit);
 
+    // ========================================================
+    // 清理普通 debug 图片
+    g_ctx.debuger->removeExpiredDirectories(
+        g_ctx.config.save_debug_images_path);
+
+    // 清理空间位置采样图片
+    g_ctx.debuger->removeExpiredDirectories(
+        g_ctx.config.save_images_path_spatial_location_val);
+
     g_ctx.g_pose_sampler = new visual_localization::PoseSampler();
     g_ctx.initialized = true;
 
