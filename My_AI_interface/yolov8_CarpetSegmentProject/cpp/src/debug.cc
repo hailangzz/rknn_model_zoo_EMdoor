@@ -79,13 +79,17 @@ std::string Debug::getDeviceSN(const std::string &file_path)
 
         if (pos != std::string::npos)
         {
-            auto colon = line.find(":");
+            // 从 "sn" 的位置开始寻找冒号
+            auto colon = line.find(":", pos);
 
-            auto first_quote =
-                line.find("\"", colon);
+            if (colon == std::string::npos)
+            {
+                continue;
+            }
 
-            auto second_quote =
-                line.find("\"", first_quote + 1);
+            auto first_quote = line.find("\"", colon + 1);
+
+            auto second_quote = line.find("\"", first_quote + 1);
 
             if (first_quote != std::string::npos &&
                 second_quote != std::string::npos)

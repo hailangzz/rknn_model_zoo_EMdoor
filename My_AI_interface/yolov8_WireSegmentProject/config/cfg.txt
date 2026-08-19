@@ -2,6 +2,8 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
+task_name=wire_detect
+
 //model_path=./model/wire_f_v3_3588_960_576.rknn
 //input_width=960
 //input_height=576

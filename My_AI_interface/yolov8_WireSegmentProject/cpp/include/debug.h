@@ -101,7 +101,7 @@ private:
     std::string debug_image_save_path_;
     bool is_save_debug_image_ = false;
 
-    int fps_limit_ = 5; // 每秒图像存储帧数
+    int fps_limit_ = 5; // 每秒图像存储帧数（创建类对象时，会被配置文件中参数值初始化）
     std::atomic<int64_t> last_save_time_ms_{0};
     int save_interval_ms_; // 默认 5 FPS（每秒存储5帧）
 

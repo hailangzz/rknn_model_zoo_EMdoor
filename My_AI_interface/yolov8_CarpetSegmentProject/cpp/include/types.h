@@ -40,6 +40,7 @@ typedef struct
 struct ConfigInfo
 {
 
+    std::string task_name;
     std::string model_path;
     int input_width;
     int input_height;

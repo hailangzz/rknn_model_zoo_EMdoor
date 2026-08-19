@@ -26,6 +26,7 @@ ConfigInfo readConfig(const std::string &filename)
         }
     }
 
+    cfg_values.task_name = config["task_name"].c_str();
     cfg_values.model_path = config["model_path"].c_str();
     cfg_values.input_width = std::stoi(config["input_width"]);
     cfg_values.input_height = std::stoi(config["input_height"]);

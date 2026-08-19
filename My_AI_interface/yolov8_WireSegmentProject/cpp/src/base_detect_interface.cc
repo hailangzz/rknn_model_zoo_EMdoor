@@ -322,7 +322,7 @@ bool real_detect_infer(
 
             g_ctx.debuger->updateSavedPoseImageCount(target_status); // 更新基于空间的，图像目标有效性计数
 
-            std::string task_name = "wire_detect";
+            std::string task_name = g_ctx.config.task_name;
 
             std::string save_sample_info_string = g_ctx.debuger->set_ai_capture_save_info(g_ctx.debuger->device_id_sn, task_name, TargetStatusToStr(target_status), box_max_prop); // 设置AI自动化迭代的图像保存信息
 

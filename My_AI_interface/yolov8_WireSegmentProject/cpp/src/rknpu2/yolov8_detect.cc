@@ -1,45 +1,51 @@
 #include "yolov8_detect.h"
 
-ConfigInfo readConfig(const std::string& filename) {
+ConfigInfo readConfig(const std::string &filename)
+{
     ConfigInfo cfg_values;
 
     std::unordered_map<std::string, std::string> config;
     std::ifstream file(filename);
-    if (!file.is_open()) {
+    if (!file.is_open())
+    {
         std::cerr << "Failed to open config file: " << filename << std::endl;
         return cfg_values;
     }
 
     std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue; // 跳过空行和注释
+    while (std::getline(file, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue; // 跳过空行和注释
 
         std::istringstream iss(line);
         std::string key, value;
-        if (std::getline(iss, key, '=') && std::getline(iss, value)) {
+        if (std::getline(iss, key, '=') && std::getline(iss, value))
+        {
             config[key] = value;
         }
     }
 
-    cfg_values.model_path  = config["model_path"].c_str(); 
-    cfg_values.input_width  = std::stoi(config["input_width"]);  
-    cfg_values.input_height  = std::stoi(config["input_height"]);  
-    
+    cfg_values.task_name = config["task_name"].c_str();
+    cfg_values.model_path = config["model_path"].c_str();
+    cfg_values.input_width = std::stoi(config["input_width"]);
+    cfg_values.input_height = std::stoi(config["input_height"]);
+
     cfg_values.score_threshold = std::stof(config["score_threshold"]); // 输入图片尺寸
     cfg_values.max_frame_threshold = std::stoi(config["max_frame_threshold"]);
     cfg_values.BASE_AREA = std::stoi(config["BASE_AREA"]);
 
     cfg_values.camera_z_axle_top_resize_rate = std::stof(config["camera_z_axle_top_resize_rate"]); // 相机坐标系，Z轴远端缩放比例
-    cfg_values.camera_z_axle_polyfit_w0 = std::stof(config["camera_z_axle_polyfit_w0"]); 
-    cfg_values.camera_z_axle_polyfit_w1 = std::stof(config["camera_z_axle_polyfit_w1"]); 
-    cfg_values.camera_z_axle_polyfit_w2 = std::stof(config["camera_z_axle_polyfit_w2"]); 
+    cfg_values.camera_z_axle_polyfit_w0 = std::stof(config["camera_z_axle_polyfit_w0"]);
+    cfg_values.camera_z_axle_polyfit_w1 = std::stof(config["camera_z_axle_polyfit_w1"]);
+    cfg_values.camera_z_axle_polyfit_w2 = std::stof(config["camera_z_axle_polyfit_w2"]);
 
-    //相机参数配置：
-    cfg_values.camera_fx = std::stof(config["camera_fx"]); 
-    cfg_values.camera_fy = std::stof(config["camera_fy"]); 
-    cfg_values.camera_cx = std::stof(config["camera_cx"]); 
-    cfg_values.camera_cy = std::stof(config["camera_cy"]); 
-    cfg_values.camera_H = std::stof(config["camera_H"]); 
+    // 相机参数配置：
+    cfg_values.camera_fx = std::stof(config["camera_fx"]);
+    cfg_values.camera_fy = std::stof(config["camera_fy"]);
+    cfg_values.camera_cx = std::stof(config["camera_cx"]);
+    cfg_values.camera_cy = std::stof(config["camera_cy"]);
+    cfg_values.camera_H = std::stof(config["camera_H"]);
     cfg_values.camera_pitch = std::stof(config["camera_pitch"]);
     cfg_values.camera_D_0 = std::stof(config["camera_D_0"]);
     cfg_values.camera_D_1 = std::stof(config["camera_D_1"]);
@@ -60,15 +66,18 @@ ConfigInfo readConfig(const std::string& filename) {
 }
 
 // 析构函数释放 RKNN 资源
-Detector::Detector(const ConfigInfo& config) {
+Detector::Detector(const ConfigInfo &config)
+{
     memset(&rknn_app_ctx_, 0, sizeof(rknn_app_context_t));
 
     init_yolov8_model(config.model_path.c_str());
 }
 
 // 析构函数释放 RKNN 资源
-Detector::~Detector() {
-    if (ctx_ != 0) {
+Detector::~Detector()
+{
+    if (ctx_ != 0)
+    {
         ctx_ = release_yolov8_model();
         if (ctx_ != 0)
         {
@@ -77,14 +86,13 @@ Detector::~Detector() {
     }
     // if (src_image_.virt_addr != NULL)
     // {
-    //     #if defined(RV1106_1103) 
-    //             dma_buf_free(rknn_app_ctx_.img_dma_buf.size, &rknn_app_ctx_.img_dma_buf.dma_buf_fd, 
+    //     #if defined(RV1106_1103)
+    //             dma_buf_free(rknn_app_ctx_.img_dma_buf.size, &rknn_app_ctx_.img_dma_buf.dma_buf_fd,
     //                     rknn_app_ctx_.img_dma_buf.dma_buf_virt_addr);
     //     #else
     //             free(src_image_.virt_addr);
     //     #endif
     // }
-    
 }
 
 void Detector::dump_tensor_attr(rknn_tensor_attr *attr)
@@ -218,10 +226,10 @@ int Detector::release_yolov8_model()
     return 0;
 }
 
-
 int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_list *od_results)
 {
-    if (!img || !od_results) {
+    if (!img || !od_results)
+    {
         return -1;
     }
 
@@ -245,12 +253,13 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // -----------------------------
     rknn_app_ctx_.input_image_width = img->width;
     rknn_app_ctx_.input_image_height = img->height;
-    dst_img.width  = rknn_app_ctx_.model_width;
+    dst_img.width = rknn_app_ctx_.model_width;
     dst_img.height = rknn_app_ctx_.model_height;
     dst_img.format = IMAGE_FORMAT_RGB888; // 确保 RGA/NPU 支持
-    dst_img.size   = get_image_size(&dst_img);
+    dst_img.size = get_image_size(&dst_img);
 
-    if (posix_memalign((void**)&dst_img.virt_addr, 64, dst_img.size) != 0) {
+    if (posix_memalign((void **)&dst_img.virt_addr, 64, dst_img.size) != 0)
+    {
         printf("failed to allocate aligned memory for dst_img\n");
         return -1;
     }
@@ -261,25 +270,28 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // -----------------------------
     image_buffer_t src_img_aligned = *img;
 
-    if (img->format == IMAGE_FORMAT_RGBA8888) {
+    if (img->format == IMAGE_FORMAT_RGBA8888)
+    {
         // 将 RGBA -> RGB（手动逐像素转换）
-        unsigned char* src = img->virt_addr;
-        unsigned char* dst = (unsigned char*)malloc(img->width * img->height * 3);
-        if (!dst) {
+        unsigned char *src = img->virt_addr;
+        unsigned char *dst = (unsigned char *)malloc(img->width * img->height * 3);
+        if (!dst)
+        {
             printf("malloc failed for RGB conversion\n");
             free(dst_img.virt_addr);
             return -1;
         }
 
-        for (int i = 0; i < img->width * img->height; i++) {
+        for (int i = 0; i < img->width * img->height; i++)
+        {
             dst[i * 3 + 0] = src[i * 4 + 0]; // R
             dst[i * 3 + 1] = src[i * 4 + 1]; // G
             dst[i * 3 + 2] = src[i * 4 + 2]; // B
         }
 
         src_img_aligned.virt_addr = dst;
-        src_img_aligned.format    = IMAGE_FORMAT_RGB888;
-        src_img_aligned.size      = img->width * img->height * 3;
+        src_img_aligned.format = IMAGE_FORMAT_RGB888;
+        src_img_aligned.size = img->width * img->height * 3;
     }
 
     // -----------------------------
@@ -287,8 +299,8 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // -----------------------------
     ret = convert_image_with_letterbox(&src_img_aligned, &dst_img, &letter_box, bg_color);
 
-
-    if (ret < 0) {
+    if (ret < 0)
+    {
         printf("convert_image_with_letterbox fail! ret=%d\n", ret);
         if (img->format == IMAGE_FORMAT_RGBA8888)
             free(src_img_aligned.virt_addr);
@@ -300,13 +312,14 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // Step 4: 设置 RKNN 输入
     // -----------------------------
     inputs[0].index = 0;
-    inputs[0].type  = RKNN_TENSOR_UINT8;
-    inputs[0].fmt   = RKNN_TENSOR_NHWC;
-    inputs[0].size  = dst_img.width * dst_img.height * 3; // RGB888
-    inputs[0].buf   = dst_img.virt_addr;
+    inputs[0].type = RKNN_TENSOR_UINT8;
+    inputs[0].fmt = RKNN_TENSOR_NHWC;
+    inputs[0].size = dst_img.width * dst_img.height * 3; // RGB888
+    inputs[0].buf = dst_img.virt_addr;
 
     ret = rknn_inputs_set(rknn_app_ctx_.rknn_ctx, rknn_app_ctx_.io_num.n_input, inputs);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         printf("rknn_inputs_set fail! ret=%d\n", ret);
         goto out;
     }
@@ -315,7 +328,8 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // Step 5: 推理
     // -----------------------------
     ret = rknn_run(rknn_app_ctx_.rknn_ctx, nullptr);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         printf("rknn_run fail! ret=%d\n", ret);
         goto out;
     }
@@ -323,13 +337,15 @@ int Detector::inference_yolov8_model(image_buffer_t *img, object_detect_result_l
     // -----------------------------
     // Step 6: 获取输出
     // -----------------------------
-    for (int i = 0; i < rknn_app_ctx_.io_num.n_output; i++) {
-        outputs[i].index      = i;
+    for (int i = 0; i < rknn_app_ctx_.io_num.n_output; i++)
+    {
+        outputs[i].index = i;
         outputs[i].want_float = (!rknn_app_ctx_.is_quant);
     }
 
     ret = rknn_outputs_get(rknn_app_ctx_.rknn_ctx, rknn_app_ctx_.io_num.n_output, outputs, NULL);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         printf("rknn_outputs_get fail! ret=%d\n", ret);
         goto out;
     }
