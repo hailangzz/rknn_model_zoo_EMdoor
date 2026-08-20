@@ -737,31 +737,247 @@ bool Debug::createDirectoryRecursive(
 
     return true;
 }
-// 删除过期目录
-void Debug::removeExpiredDirectories()
+
+// =====================================================
+// 递归删除目录
+//
+// 删除逻辑：
+//   文件      -> unlink()
+//   子目录    -> 递归删除
+//   空目录    -> rmdir()
+//
+// 不经过 system() / shell
+// =====================================================
+
+bool Debug::removeDirectoryRecursive(
+    const std::string &path)
 {
-    DIR *dir = opendir(debug_image_save_path_.c_str());
+    if (path.empty())
+    {
+        return false;
+    }
+
+    struct stat st;
+
+    // =================================================
+    // 检查路径
+    // =================================================
+
+    if (lstat(
+            path.c_str(),
+            &st) != 0)
+    {
+        // 不存在，认为已经删除
+        if (errno == ENOENT)
+        {
+            return true;
+        }
+
+        std::cerr
+            << "[Debug] lstat failed: "
+            << path
+            << " errno="
+            << errno
+            << std::endl;
+
+        return false;
+    }
+
+    // =================================================
+    // 如果不是目录，直接删除
+    // =================================================
+
+    if (!S_ISDIR(st.st_mode))
+    {
+        if (unlink(path.c_str()) != 0)
+        {
+            std::cerr
+                << "[Debug] unlink failed: "
+                << path
+                << " errno="
+                << errno
+                << std::endl;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    // =================================================
+    // 打开目录
+    // =================================================
+
+    DIR *dir =
+        opendir(path.c_str());
 
     if (dir == nullptr)
     {
-        std::cerr << "open dir failed: "
-                  << debug_image_save_path_
-                  << std::endl;
+        std::cerr
+            << "[Debug] opendir failed: "
+            << path
+            << " errno="
+            << errno
+            << std::endl;
+
+        return false;
+    }
+
+    bool success = true;
+
+    struct dirent *entry;
+
+    // =================================================
+    // 遍历目录
+    // =================================================
+
+    while ((entry = readdir(dir)) != nullptr)
+    {
+        std::string name =
+            entry->d_name;
+
+        // 跳过 . 和 ..
+        if (name == "." ||
+            name == "..")
+        {
+            continue;
+        }
+
+        std::string child_path =
+            path +
+            "/" +
+            name;
+
+        // =================================================
+        // 递归删除
+        // =================================================
+
+        if (!removeDirectoryRecursive(
+                child_path))
+        {
+            success = false;
+        }
+    }
+
+    // =================================================
+    // 关闭目录
+    // =================================================
+
+    closedir(dir);
+
+    // =================================================
+    // 如果子文件删除失败
+    // 不删除父目录
+    // =================================================
+
+    if (!success)
+    {
+        return false;
+    }
+
+    // =================================================
+    // 删除空目录
+    // =================================================
+
+    if (rmdir(path.c_str()) != 0)
+    {
+        // 可能已经被其他线程/进程删除
+        if (errno == ENOENT)
+        {
+            return true;
+        }
+
+        std::cerr
+            << "[Debug] rmdir failed: "
+            << path
+            << " errno="
+            << errno
+            << std::endl;
+
+        return false;
+    }
+
+    return true;
+}
+
+// 删除过期目录
+// =====================================================
+// 删除过期目录
+//
+// 目录结构：
+//
+// root_path/
+// ├── task_name/
+// │   ├── device_sn/
+// │   │   ├── YYYYMMDD/
+// │   │   │   ├── EXISTS/
+// │   │   │   ├── MIDDLE/
+// │   │   │   └── NONE/
+// │   │   └── YYYYMMDD/
+// │   └── device_sn/
+// └── task_name/
+//
+// 清理规则：
+//
+// 1. 同一个 device_sn 下日期目录 < 5 个：
+//    不执行 keep_days_ 过期删除。
+//
+// 2. 日期目录 >= 5 个：
+//    删除超过 keep_days_ 的日期目录。
+//
+// 3. root_path 总文件大小 > 10GB：
+//    跨 task/device 查找最老日期目录，删除后重新统计。
+//    直到 root_path <= 10GB。
+//
+// 注意：
+// 10GB 存储压力清理优先级高于“至少保留5个日期目录”。
+// =====================================================
+
+void Debug::removeExpiredDirectories(
+    const std::string &root_path)
+{
+    if (root_path.empty())
+    {
+        std::cerr
+            << "[Debug] root path is empty"
+            << std::endl;
+
         return;
     }
 
-    // 获取过期日期
-    auto now = std::chrono::system_clock::now();
+    // =================================================
+    // 配置
+    // =================================================
+
+    constexpr uint64_t MAX_STORAGE_BYTES =
+        10ULL *
+        1024ULL *
+        1024ULL *
+        1024ULL;
+
+    constexpr size_t MIN_DATE_DIRECTORY_COUNT = 5;
+
+    // =================================================
+    // 计算过期日期
+    // =================================================
+
+    auto now =
+        std::chrono::system_clock::now();
 
     auto expire_time =
-        now - std::chrono::hours(24 * keep_days_);
+        now -
+        std::chrono::hours(
+            24 * keep_days_);
 
     std::time_t expire_tt =
-        std::chrono::system_clock::to_time_t(expire_time);
+        std::chrono::system_clock::to_time_t(
+            expire_time);
 
     std::tm expire_tm;
 
-    localtime_r(&expire_tt, &expire_tm);
+    localtime_r(
+        &expire_tt,
+        &expire_tm);
 
     char expire_date[16] = {0};
 
@@ -771,43 +987,564 @@ void Debug::removeExpiredDirectories()
         "%Y%m%d",
         &expire_tm);
 
-    struct dirent *entry;
+    // =================================================
+    // 第一阶段
+    //
+    // 按 keep_days_ 删除过期日期目录
+    // =================================================
 
-    while ((entry = readdir(dir)) != nullptr)
+    DIR *root_dir =
+        opendir(root_path.c_str());
+
+    if (root_dir == nullptr)
     {
-        std::string dir_name = entry->d_name;
-
-        // 跳过 . 和 ..
-        if (dir_name == "." || dir_name == "..")
+        if (errno == ENOENT)
         {
-            continue;
+            return;
         }
 
-        // 必须是8位日期目录
-        if (dir_name.size() != 8)
-        {
-            continue;
-        }
+        std::cerr
+            << "[Debug] open root dir failed: "
+            << root_path
+            << " errno="
+            << errno
+            << std::endl;
 
-        // 判断是否过期
-        if (dir_name < expire_date)
-        {
-            std::string full_path =
-                debug_image_save_path_ + "/" + dir_name;
-
-            std::cout << "remove expired dir: "
-                      << full_path
-                      << std::endl;
-
-            // 递归删除目录
-            std::string cmd =
-                "rm -rf " + full_path;
-
-            system(cmd.c_str());
-        }
+        return;
     }
 
-    closedir(dir);
+    struct dirent *task_entry;
+
+    // =================================================
+    // 第一层：task_name
+    // =================================================
+
+    while ((task_entry = readdir(root_dir)) != nullptr)
+    {
+        std::string task_name =
+            task_entry->d_name;
+
+        if (task_name == "." ||
+            task_name == "..")
+        {
+            continue;
+        }
+
+        std::string task_path =
+            root_path +
+            "/" +
+            task_name;
+
+        struct stat task_st;
+
+        if (stat(
+                task_path.c_str(),
+                &task_st) != 0)
+        {
+            continue;
+        }
+
+        if (!S_ISDIR(task_st.st_mode))
+        {
+            continue;
+        }
+
+        // =================================================
+        // 第二层：device_sn
+        // =================================================
+
+        DIR *device_dir =
+            opendir(task_path.c_str());
+
+        if (device_dir == nullptr)
+        {
+            std::cerr
+                << "[Debug] open task dir failed: "
+                << task_path
+                << std::endl;
+
+            continue;
+        }
+
+        struct dirent *device_entry;
+
+        while ((device_entry = readdir(device_dir)) != nullptr)
+        {
+            std::string device_sn =
+                device_entry->d_name;
+
+            if (device_sn == "." ||
+                device_sn == "..")
+            {
+                continue;
+            }
+
+            std::string device_path =
+                task_path +
+                "/" +
+                device_sn;
+
+            struct stat device_st;
+
+            if (stat(
+                    device_path.c_str(),
+                    &device_st) != 0)
+            {
+                continue;
+            }
+
+            if (!S_ISDIR(device_st.st_mode))
+            {
+                continue;
+            }
+
+            // =================================================
+            // 获取日期目录
+            // =================================================
+
+            std::vector<std::string> date_directories;
+
+            DIR *date_dir =
+                opendir(device_path.c_str());
+
+            if (date_dir == nullptr)
+            {
+                continue;
+            }
+
+            struct dirent *date_entry;
+
+            while ((date_entry = readdir(date_dir)) != nullptr)
+            {
+                std::string date_name =
+                    date_entry->d_name;
+
+                if (date_name == "." ||
+                    date_name == "..")
+                {
+                    continue;
+                }
+
+                // 必须是 YYYYMMDD
+                if (date_name.size() != 8)
+                {
+                    continue;
+                }
+
+                bool valid_date = true;
+
+                for (char c : date_name)
+                {
+                    if (!std::isdigit(
+                            static_cast<unsigned char>(c)))
+                    {
+                        valid_date = false;
+                        break;
+                    }
+                }
+
+                if (!valid_date)
+                {
+                    continue;
+                }
+
+                std::string date_path =
+                    device_path +
+                    "/" +
+                    date_name;
+
+                struct stat date_st;
+
+                if (stat(
+                        date_path.c_str(),
+                        &date_st) != 0)
+                {
+                    continue;
+                }
+
+                if (!S_ISDIR(date_st.st_mode))
+                {
+                    continue;
+                }
+
+                date_directories.push_back(
+                    date_name);
+            }
+
+            closedir(date_dir);
+
+            // =================================================
+            // 日期目录少于5个
+            //
+            // 不进行 keep_days_ 清理
+            // =================================================
+
+            if (date_directories.size() <
+                MIN_DATE_DIRECTORY_COUNT)
+            {
+                std::cout
+                    << "[Debug] skip expired cleanup: "
+                    << device_path
+                    << ", date count="
+                    << date_directories.size()
+                    << " < "
+                    << MIN_DATE_DIRECTORY_COUNT
+                    << std::endl;
+
+                continue;
+            }
+
+            // =================================================
+            // 删除过期目录
+            // =================================================
+
+            for (const auto &date_name :
+                 date_directories)
+            {
+                if (date_name >= expire_date)
+                {
+                    continue;
+                }
+
+                std::string date_path =
+                    device_path +
+                    "/" +
+                    date_name;
+
+                std::cout
+                    << "[Debug] remove expired dir: "
+                    << date_path
+                    << std::endl;
+
+                if (!removeDirectoryRecursive(
+                        date_path))
+                {
+                    std::cerr
+                        << "[Debug] remove expired dir failed: "
+                        << date_path
+                        << std::endl;
+                }
+            }
+        }
+
+        closedir(device_dir);
+    }
+
+    closedir(root_dir);
+
+    // =================================================
+    // 第二阶段
+    //
+    // 检查 root_path 总存储大小
+    // =================================================
+
+    auto calculateDirectorySize =
+        [&](const std::string &path,
+            auto &&self) -> uint64_t
+    {
+        uint64_t total_size = 0;
+
+        DIR *dir =
+            opendir(path.c_str());
+
+        if (dir == nullptr)
+        {
+            return 0;
+        }
+
+        struct dirent *entry;
+
+        while ((entry = readdir(dir)) != nullptr)
+        {
+            std::string name =
+                entry->d_name;
+
+            if (name == "." ||
+                name == "..")
+            {
+                continue;
+            }
+
+            std::string full_path =
+                path +
+                "/" +
+                name;
+
+            struct stat st;
+
+            if (stat(
+                    full_path.c_str(),
+                    &st) != 0)
+            {
+                continue;
+            }
+
+            if (S_ISDIR(st.st_mode))
+            {
+                total_size +=
+                    self(
+                        full_path,
+                        self);
+            }
+            else if (S_ISREG(st.st_mode))
+            {
+                total_size +=
+                    static_cast<uint64_t>(
+                        st.st_size);
+            }
+        }
+
+        closedir(dir);
+
+        return total_size;
+    };
+
+    // =================================================
+    // 获取当前 root_path 大小
+    // =================================================
+
+    uint64_t total_size =
+        calculateDirectorySize(
+            root_path,
+            calculateDirectorySize);
+
+    std::cout
+        << "[Debug] root storage usage: "
+        << static_cast<double>(total_size) /
+               (1024.0 * 1024.0 * 1024.0)
+        << " GB"
+        << std::endl;
+
+    // =================================================
+    // 超过10GB
+    // 不断删除最老日期目录
+    // =================================================
+
+    while (total_size >
+           MAX_STORAGE_BYTES)
+    {
+        std::string oldest_date;
+
+        std::string oldest_date_path;
+
+        // =================================================
+        // 搜索整个 root_path
+        // 找最老 YYYYMMDD
+        // =================================================
+
+        DIR *task_dir =
+            opendir(root_path.c_str());
+
+        if (task_dir == nullptr)
+        {
+            break;
+        }
+
+        struct dirent *task_entry;
+
+        while ((task_entry = readdir(task_dir)) != nullptr)
+        {
+            std::string task_name =
+                task_entry->d_name;
+
+            if (task_name == "." ||
+                task_name == "..")
+            {
+                continue;
+            }
+
+            std::string task_path =
+                root_path +
+                "/" +
+                task_name;
+
+            struct stat task_st;
+
+            if (stat(
+                    task_path.c_str(),
+                    &task_st) != 0 ||
+                !S_ISDIR(task_st.st_mode))
+            {
+                continue;
+            }
+
+            // =================================================
+            // device_sn
+            // =================================================
+
+            DIR *device_dir =
+                opendir(task_path.c_str());
+
+            if (device_dir == nullptr)
+            {
+                continue;
+            }
+
+            struct dirent *device_entry;
+
+            while ((device_entry = readdir(device_dir)) != nullptr)
+            {
+                std::string device_sn =
+                    device_entry->d_name;
+
+                if (device_sn == "." ||
+                    device_sn == "..")
+                {
+                    continue;
+                }
+
+                std::string device_path =
+                    task_path +
+                    "/" +
+                    device_sn;
+
+                struct stat device_st;
+
+                if (stat(
+                        device_path.c_str(),
+                        &device_st) != 0 ||
+                    !S_ISDIR(device_st.st_mode))
+                {
+                    continue;
+                }
+
+                // =================================================
+                // 日期目录
+                // =================================================
+
+                DIR *date_dir =
+                    opendir(device_path.c_str());
+
+                if (date_dir == nullptr)
+                {
+                    continue;
+                }
+
+                struct dirent *date_entry;
+
+                while ((date_entry = readdir(date_dir)) != nullptr)
+                {
+                    std::string date_name =
+                        date_entry->d_name;
+
+                    if (date_name == "." ||
+                        date_name == "..")
+                    {
+                        continue;
+                    }
+
+                    if (date_name.size() != 8)
+                    {
+                        continue;
+                    }
+
+                    bool valid_date = true;
+
+                    for (char c : date_name)
+                    {
+                        if (!std::isdigit(
+                                static_cast<unsigned char>(c)))
+                        {
+                            valid_date = false;
+                            break;
+                        }
+                    }
+
+                    if (!valid_date)
+                    {
+                        continue;
+                    }
+
+                    std::string date_path =
+                        device_path +
+                        "/" +
+                        date_name;
+
+                    struct stat date_st;
+
+                    if (stat(
+                            date_path.c_str(),
+                            &date_st) != 0 ||
+                        !S_ISDIR(date_st.st_mode))
+                    {
+                        continue;
+                    }
+
+                    // =================================================
+                    // 找最老日期
+                    // =================================================
+
+                    if (oldest_date.empty() ||
+                        date_name < oldest_date)
+                    {
+                        oldest_date =
+                            date_name;
+
+                        oldest_date_path =
+                            date_path;
+                    }
+                }
+
+                closedir(date_dir);
+            }
+
+            closedir(device_dir);
+        }
+
+        closedir(task_dir);
+
+        // =================================================
+        // 没找到日期目录
+        // 防止死循环
+        // =================================================
+
+        if (oldest_date_path.empty())
+        {
+            std::cerr
+                << "[Debug] storage exceeds 10GB, "
+                   "but no date directory found"
+                << std::endl;
+
+            break;
+        }
+
+        // =================================================
+        // 删除最老日期目录
+        // =================================================
+
+        std::cout
+            << "[Debug] storage exceeds 10GB, "
+               "remove oldest date dir: "
+            << oldest_date_path
+            << std::endl;
+
+        if (!removeDirectoryRecursive(
+                oldest_date_path))
+        {
+            std::cerr
+                << "[Debug] remove oldest date dir failed: "
+                << oldest_date_path
+                << std::endl;
+
+            break;
+        }
+
+        // =================================================
+        // 重新计算 root_path 大小
+        // =================================================
+
+        total_size =
+            calculateDirectorySize(
+                root_path,
+                calculateDirectorySize);
+
+        std::cout
+            << "[Debug] storage usage after cleanup: "
+            << static_cast<double>(total_size) /
+                   (1024.0 * 1024.0 * 1024.0)
+            << " GB"
+            << std::endl;
+    }
 }
 
 int64_t Debug::getCurrentTimestampMs()

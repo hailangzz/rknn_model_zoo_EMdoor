@@ -92,7 +92,11 @@ public:
         TargetStatus status);
 
     // 删除旧数据
-    void removeExpiredDirectories();
+    bool removeDirectoryRecursive(
+        const std::string &path);
+
+    void removeExpiredDirectories(
+        const std::string &root_path);
 
 private:
     std::string generateFileName(const std::string &tag);
