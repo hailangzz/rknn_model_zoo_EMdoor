@@ -42,4 +42,4 @@ debug_score_threshold=0.3f
 save_debug_images_path=/home/robot/share/AI_Program/CarpetSegmentProject/images
 save_images_path_spatial_location_val=/home/robot/share/AI_Program/CarpetSegmentProject/spatial_location_val_images
 is_save_debug_images=true
-fps_limit=5
+fps_limit=3

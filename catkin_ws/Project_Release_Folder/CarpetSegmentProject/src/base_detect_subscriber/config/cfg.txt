@@ -2,6 +2,7 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
+task_name=carpet_detect
 model_path=./model/carpet_f_seg_0615.rknn
 input_width=640
 input_height=640
@@ -41,4 +42,4 @@ debug_score_threshold=0.3f
 save_debug_images_path=/home/robot/share/AI_Program/CarpetSegmentProject/images
 save_images_path_spatial_location_val=/home/robot/share/AI_Program/CarpetSegmentProject/spatial_location_val_images
 is_save_debug_images=true
-fps_limit=5
+fps_limit=3
