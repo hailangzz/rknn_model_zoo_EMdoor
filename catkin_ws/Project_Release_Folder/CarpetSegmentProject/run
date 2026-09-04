@@ -1,0 +1,53 @@
+
+
+#  在终端依次运行以下命令：
+
+
+    cd ~/share/CarpetSegmentProject
+    
+    sudo cp ai_debug.service /etc/systemd/system/ai_debug.service
+    
+    sudo systemctl daemon-reload
+    
+    sudo systemctl enable ai_debug.service
+    
+    sudo systemctl start ai_debug.service
+
+
+
+    
+    sudo systemctl status ai_debug.service
+
+
+
+
+# 测试AI节点
+
+  # 进入窗体
+  tmux attach -t ai_debug
+
+	# 找到节点
+	pgrep -af main_carpet_detect_subscriber_node
+	
+	# 杀死节点
+	pkill -f main_carpet_detect_subscriber_node
+
+
+
+# 1. 重新加载 systemd 配置
+sudo systemctl daemon-reload
+
+# 2. 开启开机自启动
+sudo systemctl enable ai_debug.service
+
+# 3. 启动服务进行测试
+sudo systemctl start ai_debug.service
+
+# 4. 检查服务运行状态（应显示 active (running)）
+sudo systemctl status ai_debug.service
+
+# 5.关闭服务
+sudo systemctl stop ai_debug.service
+
+# 6. 禁止重启
+sudo systemctl disable ai_debug.service

@@ -25,6 +25,8 @@ bool base_model_init(const char *config_path)
 
     g_ctx.debuger = new Debug(g_ctx.config.save_debug_images_path, g_ctx.config.is_save_debug_images, g_ctx.config.fps_limit);
 
+    // 检查设备，本地存储空间。存储量低于5GB时，停止数据采集。
+    g_ctx.debuger->checkRootDiskSpace();
     // ========================================================
     // 清理普通 debug 图片
     g_ctx.debuger->removeExpiredDirectories(

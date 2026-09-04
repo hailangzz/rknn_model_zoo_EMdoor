@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sstream>
 #include <iomanip>
+#include <sys/statvfs.h>
 
 enum class TargetStatus
 {
@@ -96,6 +97,8 @@ public:
 
     void removeExpiredDirectories(
         const std::string &root_path);
+
+    bool checkRootDiskSpace();
 
 private:
     std::string generateFileName(const std::string &tag);

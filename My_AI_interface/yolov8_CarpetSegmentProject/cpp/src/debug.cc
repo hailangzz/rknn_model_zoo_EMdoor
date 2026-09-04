@@ -1577,3 +1577,54 @@ std::string Debug::set_ai_capture_save_info(
 
     return oss.str();
 }
+
+bool Debug::checkRootDiskSpace()
+{
+    struct statvfs stat;
+
+    if (statvfs("/", &stat) != 0)
+    {
+        std::cerr
+            << "[Debug] statvfs failed, errno="
+            << errno
+            << std::endl;
+
+        return true;
+    }
+
+    uint64_t available_bytes =
+        static_cast<uint64_t>(stat.f_bavail) *
+        static_cast<uint64_t>(stat.f_frsize);
+
+    constexpr uint64_t MIN_FREE_SPACE_BYTES =
+        5ULL *
+        1024ULL *
+        1024ULL *
+        1024ULL;
+
+    double available_gb =
+        static_cast<double>(available_bytes) /
+        (1024.0 * 1024.0 * 1024.0);
+
+    std::cout
+        << "[Debug] root filesystem available space: "
+        << std::fixed
+        << std::setprecision(2)
+        << available_gb
+        << " GB"
+        << std::endl;
+
+    if (available_bytes < MIN_FREE_SPACE_BYTES)
+    {
+        is_save_debug_image_ = false;
+
+        std::cout
+            << "[Debug] root filesystem free space < 5GB, "
+            << "disable debug image saving"
+            << std::endl;
+
+        return false;
+    }
+
+    return true;
+}
