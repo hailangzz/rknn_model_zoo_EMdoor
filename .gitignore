@@ -66,3 +66,5 @@ My_AI_interface/yolov8_HandDetectProject/database_test/
 
 *.tar
 
+# 忽略每次更新优化的模型
+catkin_ws/Project_Release_Folder/total_update_models
