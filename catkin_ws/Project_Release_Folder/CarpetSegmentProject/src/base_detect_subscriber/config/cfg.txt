@@ -3,7 +3,7 @@
 // 预测框置信度
 
 task_name=carpet_detect
-model_path=./model/carpet_f_seg_0615.rknn
+model_path=./model/carpet-seg_v001_date_20260915_yolov8s_p0.89-r0.90-map0.88_release-20260921.rknn
 input_width=640
 input_height=640
 score_threshold=0.5f
