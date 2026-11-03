@@ -4,6 +4,9 @@
 
 
     cd ~/share/CarpetSegmentProject
+
+    source /opt/ros/noetic/setup.bash
+    catkin_make install
     
     sudo cp ai_debug.service /etc/systemd/system/ai_debug.service
     
