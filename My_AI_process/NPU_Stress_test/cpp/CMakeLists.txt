@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(rknn_npu_stress_test_demo)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (ENABLE_ASAN)
 	message(STATUS "BUILD WITH ADDRESS SANITIZER")

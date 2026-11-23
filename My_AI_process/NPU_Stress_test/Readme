@@ -1,7 +1,14 @@
+
 // 默认测试demo: \
   sudo ./rknn_npu_stress_test_demo 
 
 
+
 // 多线程压力,测试demo:  \
-  sudo ./rknn_npu_stress_test_demo --models model/liquid_960p.rknn model/wire_960p.rknn --threads 4 6 8 --time 30 --output report.csv
-  
+  sudo ./rknn_npu_stress_test_demo \
+    --model model/liquid_960p.rknn \
+    --threads 3 \
+    --hours 12 \
+    --interval 5 \
+    --csv ./results/npu_stress.csv
+
