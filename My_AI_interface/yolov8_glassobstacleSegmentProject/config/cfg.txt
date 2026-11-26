@@ -1,0 +1,67 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+task_name=glassobstacle_detect
+
+model_path=./model/glassobstacle-seg_v001_date_20261120_yolov8s_p0.85-r0.83-map0.76_release-20261123.rknn
+input_width=640
+input_height=640
+
+score_threshold=0.7f
+
+//检测帧数阈值
+max_frame_threshold=3
+
+//BASE的类别ID，于建图配合，设定BASE目标的重要程度（玻璃语义231）
+BASE_AREA=231
+
+//相机坐标系：远端Z轴比例缩放
+camera_z_axle_top_resize_rate=1.0
+camera_z_axle_polyfit_w0=0.2220
+camera_z_axle_polyfit_w1=0.8531
+camera_z_axle_polyfit_w2=0.1568
+
+//相机内参、高度、俯仰角度 (俯仰角 15° ~ 20° 常见)
+camera_fx=411.381960
+camera_fy=411.535817
+camera_cx=637.411269
+camera_cy=351.293005
+camera_H=0.209539
+camera_pitch=-0.0318038
+camera_D_0=1.171783
+camera_D_1=0.226351
+camera_D_2=0.000015
+camera_D_3=0.000199
+camera_D_4=0.003289
+camera_D_5=1.455798
+camera_D_6=0.474246
+camera_D_7=0.024653
+
+//后处理过滤：最近像素深度阈值（米）
+//扫地机相机高度约0.21m，地面假设测距在3~4m后误差快速放大；建议4.0
+//若仍想保留更远目标，可改为7.0
+max_detect_distance_m=4.0
+min_detect_distance_m=0.15
+min_edge_points=4
+min_object_width_m=0.08
+max_object_width_m=6.0
+
+//玻璃底端接地线（语义建图只建这条线）
+//取 mask 外轮廓下凸包（不是从检测框底往上扫，避免线贴齐框底）
+bottom_line_sample_step_px=2
+bottom_line_median_k=5
+bottom_line_fit_straight=true
+bottom_line_fit_sample_num=8
+//框底离图像底空隙比例超过该值 → 判定悬空（未接地）
+floating_bottom_gap_ratio=0.10
+//悬空时假设底边离地高度（米），须小于相机高度(~0.21)，否则自动退回地面
+glass_floating_assume_height_m=0.05
+
+//debug配置管理
+debug_score_threshold=0.3f
+//save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/glassobstacleSegmentProject/images
+save_debug_images_path=/home/robot/share/AI_Program/glassobstacleSegmentProject/images
+save_images_path_spatial_location_val=/home/robot/share/AI_Program/glassobstacleSegmentProject/spatial_location_val_images
+is_save_debug_images=true
+fps_limit=3

@@ -17,5 +17,5 @@ export LD_LIBRARY_PATH=${PKG_SHARE}/lib:$LD_LIBRARY_PATH
 # 设置ROS环境
 source ${INSTALL_PREFIX}/setup.bash
 
-echo "启动 main_carpet_detect_subscriber_node..."
-exec ${SCRIPT_DIR}/main_carpet_detect_subscriber_node
+echo "启动 main_ai_detect_subscriber_node..."
+exec ${SCRIPT_DIR}/main_ai_detect_subscriber_node

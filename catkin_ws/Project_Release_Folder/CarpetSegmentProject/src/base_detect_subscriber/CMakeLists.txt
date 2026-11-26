@@ -41,13 +41,13 @@ include_directories(
 # ------------------------------------------------
 # 可执行程序
 # ------------------------------------------------
-add_executable(main_carpet_detect_subscriber_node
+add_executable(main_ai_detect_subscriber_node
   src/main_subscriber_node.cpp
   src/subscriber_operation.cpp
 )
 
-# 修改此处的编译项目名称（main_carpet_detect_subscriber_node）以匹配上面 main_carpet_detect_subscriber_node 定义的名称
-set_target_properties(main_carpet_detect_subscriber_node PROPERTIES
+# 修改此处的编译项目名称（main_ai_detect_subscriber_node）以匹配上面 main_ai_detect_subscriber_node 定义的名称
+set_target_properties(main_ai_detect_subscriber_node PROPERTIES
   INSTALL_RPATH "$ORIGIN/../../share/carpet_detect_subscriber/lib"
   BUILD_WITH_INSTALL_RPATH TRUE
 )
@@ -55,7 +55,7 @@ set_target_properties(main_carpet_detect_subscriber_node PROPERTIES
 # ------------------------------------------------
 # 链接库
 # ------------------------------------------------
-target_link_libraries(main_carpet_detect_subscriber_node
+target_link_libraries(main_ai_detect_subscriber_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 
@@ -69,7 +69,7 @@ target_link_libraries(main_carpet_detect_subscriber_node
 # ------------------------------------------------
 # 依赖（消息 / catkin）
 # ------------------------------------------------
-add_dependencies(main_carpet_detect_subscriber_node
+add_dependencies(main_ai_detect_subscriber_node
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
 )
@@ -79,7 +79,7 @@ add_dependencies(main_carpet_detect_subscriber_node
 # ------------------------------------------------
 
 # 1️⃣ 安装可执行程序
-install(TARGETS main_carpet_detect_subscriber_node
+install(TARGETS main_ai_detect_subscriber_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

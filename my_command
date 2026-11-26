@@ -36,6 +36,8 @@ onnx 模型转rknn:
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_DetectModelCollectSampleProject
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_LiquidSegmentProject
   ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_HandDetectProjectSaveImage
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_glassobstacleSegmentProject
+  ./build-linux-my-interface.sh -t rk3588 -a aarch64 -d yolov8_StandbaseSegmentProject
 
   
   安卓版接口项目
