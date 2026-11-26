@@ -1,0 +1,33 @@
+[Unit]
+Description=AI Debug Auto Start Service
+After=network-online.target
+Wants=network-online.target
+
+# 工作目录必须存在
+AssertPathExists=/home/robot/share/CarpetSegmentProject
+
+[Service]
+Type=simple
+
+User=robot
+Group=robot
+
+WorkingDirectory=/home/robot/share/CarpetSegmentProject
+
+# 负责监控并维护 tmux ai_debug
+ExecStart=/bin/bash /home/robot/share/CarpetSegmentProject/ai_debug_launcher.sh
+
+# launcher 自身异常退出时自动重启
+Restart=on-failure
+RestartSec=5
+
+# 日志进入 journal
+StandardOutput=journal
+StandardError=journal
+
+# 停止服务时杀掉 launcher
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

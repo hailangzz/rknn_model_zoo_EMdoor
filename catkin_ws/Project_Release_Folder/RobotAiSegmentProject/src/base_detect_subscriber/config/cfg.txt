@@ -1,0 +1,53 @@
+// 模型路径
+// 模型输入图像尺寸
+// 预测框置信度
+
+task_name=robot_ai_detect
+model_path=./model/robot_ai-seg_v001_date_20261126_yolov8s_p0.temp-r0.temp-map0.temp_release-20261126.rknn
+input_width=640
+input_height=640
+score_threshold=0.5f
+
+//检测帧数阈值
+max_frame_threshold=3
+
+//BASE的类别ID，于建图配合；未知/兜底类别使用
+// 229：感知调试id（调试使用，不影响设备运动控制）
+BASE_AREA=229
+
+// 多类别配置（顺序必须与模型输出 class id 0..N-1 一致）
+// 换模型时只需改这两行 + model/coco_80_labels_list.txt
+// 当前：0地毯60、1线材201、2液体221、3塑料袋151
+num_classes=4
+class_names=carpet,wire,liquid,plasticbag
+class_app_ids=60,201,221,151
+
+//相机坐标系：远端Z轴比例缩放
+camera_z_axle_top_resize_rate=1.0
+camera_z_axle_polyfit_w0=0.2220
+camera_z_axle_polyfit_w1=0.8531
+camera_z_axle_polyfit_w2=0.1568
+
+//相机内参、高度、俯仰角度 (俯仰角 15° ~ 20° 常见)
+camera_fx=411.381960
+camera_fy=411.535817
+camera_cx=637.411269
+camera_cy=351.293005
+camera_H=0.209539
+camera_pitch=-0.0318038
+camera_D_0=1.171783
+camera_D_1=0.226351
+camera_D_2=0.000015
+camera_D_3=0.000199
+camera_D_4=0.003289
+camera_D_5=1.455798
+camera_D_6=0.474246
+camera_D_7=0.024653
+
+//debug配置管理
+debug_score_threshold=0.3f
+//save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/CarpetSegmentProject/images
+save_debug_images_path=/home/robot/share/AI_Program/RobotAiSegmentProject/images
+save_images_path_spatial_location_val=/home/robot/share/AI_Program/RobotAiSegmentProject/spatial_location_val_images
+is_save_debug_images=true
+fps_limit=3

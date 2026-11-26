@@ -1664,8 +1664,9 @@ void fillCameraDetectResult(
     //    det->camera_coordinates.add_edge_point_num);
 
     // ---------- 1. 类别 & 置信度 ----------
+    // 模型 cls_id(0..N-1) -> 业务 app id（60/201/221/151...）
     one.prop = det->prop;
-    one.cls_id = config.BASE_AREA;
+    one.cls_id = mapModelClassToAppId(det->cls_id, config);
 
     // printf("det->box.top = %d\n", det->box.top);
     // printf("det->box.bottom = %d\n", det->box.bottom);

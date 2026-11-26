@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 
@@ -1574,6 +1575,39 @@ std::string Debug::set_ai_capture_save_info(
         << "_" << std::fixed
         << std::setprecision(3)
         << safe_confidence;
+
+    return oss.str();
+}
+
+std::string Debug::set_ai_capture_save_info_multiclass(
+    const std::string &device_id_sn,
+    const std::string &model_task_type,
+    const std::string &target_status,
+    const std::vector<std::string> &class_names,
+    const std::vector<float> &class_max_scores)
+{
+    float global_max = 0.0f;
+    for (float s : class_max_scores)
+        global_max = std::max(global_max, s);
+
+    ai_capture_save_info_.device_id_sn = device_id_sn;
+    ai_capture_save_info_.model_task_type = model_task_type;
+    ai_capture_save_info_.has_target = target_status;
+    ai_capture_save_info_.confidence = global_max;
+
+    // sn_task_status_carpet-0.925_wire-0.000_liquid-0.310_plasticbag-0.000
+    std::ostringstream oss;
+    oss << device_id_sn
+        << "_" << model_task_type
+        << "_" << target_status;
+
+    const size_t n = std::min(class_names.size(), class_max_scores.size());
+    for (size_t i = 0; i < n; ++i)
+    {
+        float s = std::max(0.0f, class_max_scores[i]);
+        oss << "_" << class_names[i]
+            << "-" << std::fixed << std::setprecision(3) << s;
+    }
 
     return oss.str();
 }

@@ -15,6 +15,8 @@
 #include <sstream>
 #include <iomanip>
 #include <sys/statvfs.h>
+#include <vector>
+#include <string>
 
 enum class TargetStatus
 {
@@ -78,12 +80,20 @@ public:
     // 获取SN码
     std::string device_id_sn = ""; // 设备SN码
     std::string getDeviceSN(const std::string &file_path);
-    // 设置AI自动化迭代的图像保存信息
+    // 设置AI自动化迭代的图像保存信息（单置信度，兼容旧逻辑）
     std::string set_ai_capture_save_info(
         const std::string &device_id_sn,
         const std::string &model_task_type,
         const std::string &target_status,
         float confidence);
+
+    // 多类别：文件名后缀形如 carpet-0.925_wire-0.000_liquid-0.310_plasticbag-0.000
+    std::string set_ai_capture_save_info_multiclass(
+        const std::string &device_id_sn,
+        const std::string &model_task_type,
+        const std::string &target_status,
+        const std::vector<std::string> &class_names,
+        const std::vector<float> &class_max_scores);
 
     int64_t getCurrentTimestampMs();
 

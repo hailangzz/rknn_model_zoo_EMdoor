@@ -1,6 +1,7 @@
 #include "base_detect_interface.h"
 #include "detect_context.h"
 
+#include <algorithm>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -13,7 +14,7 @@ bool base_model_init(const char *config_path)
 {
     if (g_ctx.initialized)
     {
-        printf("carpet model already initialized");
+        printf("robot_ai model already initialized\n");
         return true;
     }
     std::string config_file_path(config_path);
@@ -39,7 +40,7 @@ bool base_model_init(const char *config_path)
     g_ctx.g_pose_sampler = new visual_localization::PoseSampler();
     g_ctx.initialized = true;
 
-    printf("carpet_model_init success");
+    printf("robot_ai_model_init success, num_classes=%d\n", g_ctx.config.num_classes);
     return true;
 }
 
@@ -167,11 +168,12 @@ bool real_detect_infer(
     std::vector<int> debug_all_cls_ids;
 
     // ========================================================
-    // 统计
+    // 统计：全局最大分 + 各类别最大分（用于 exist/middle/null 与文件命名）
     // ========================================================
 
-    // float box_max_prop = std::numeric_limits<float>::lowest();
     float box_max_prop = 0.0f;
+    const int num_cls = std::max(1, g_ctx.config.num_classes);
+    std::vector<float> class_max_scores(static_cast<size_t>(num_cls), 0.0f);
 
     // ========================================================
     // 遍历检测结果
@@ -193,7 +195,14 @@ bool real_detect_infer(
                 box_max_prop,
                 det->prop);
 
-        // 阈值过滤
+        // 按模型 cls_id 累计本帧各类最大概率（含低于业务阈值的框，便于 middle/null 命名）
+        if (det->cls_id >= 0 && det->cls_id < num_cls)
+        {
+            class_max_scores[static_cast<size_t>(det->cls_id)] =
+                std::max(class_max_scores[static_cast<size_t>(det->cls_id)], det->prop);
+        }
+
+        // 阈值过滤（对外输出 / 建图结果）
         if (det->prop <
             g_ctx.config.score_threshold)
         {
@@ -289,11 +298,12 @@ bool real_detect_infer(
 
         results.push_back(one);
 
-        // 写入调试信息里的mark轮廓和类别id，主要用于分析空间位置符合条件时，检测结果的有效性
+        // 写入调试信息里的mark轮廓和类别id（业务 app id），主要用于分析空间位置符合条件时，检测结果的有效性
+        const int app_cls_id = mapModelClassToAppId(det->cls_id, g_ctx.config);
         for (const auto &contour : contours_smoothed)
         {
             debug_all_contours.push_back(contour);
-            debug_all_cls_ids.push_back(det->cls_id);
+            debug_all_cls_ids.push_back(app_cls_id);
         }
 
         // ====================================================
@@ -335,7 +345,14 @@ bool real_detect_infer(
 
             std::string task_name = g_ctx.config.task_name;
 
-            std::string save_sample_info_string = g_ctx.debuger->set_ai_capture_save_info(g_ctx.debuger->device_id_sn, task_name, TargetStatusToStr(target_status), box_max_prop); // 设置AI自动化迭代的图像保存信息
+            // 文件名：sn_robot_ai_detect_exist_carpet-0.925_wire-0.000_liquid-0.310_plasticbag-0.000
+            std::string save_sample_info_string =
+                g_ctx.debuger->set_ai_capture_save_info_multiclass(
+                    g_ctx.debuger->device_id_sn,
+                    task_name,
+                    TargetStatusToStr(target_status),
+                    g_ctx.config.class_names,
+                    class_max_scores);
 
             g_ctx.debuger->saveSegLabel(
                 img,
@@ -351,14 +368,25 @@ bool real_detect_infer(
     // Debug输出
     // ========================================================
 
-    printf("od_results.count: %d\n",
-           od_results.count);
+    printf("od_results.count: %d, kept: %zu, box_max_prop: %.3f\n",
+           od_results.count,
+           results.size(),
+           box_max_prop);
+
+    for (int c = 0; c < num_cls; ++c)
+    {
+        printf("class[%d] %s max_score=%.3f app_id=%d\n",
+               c,
+               getModelClassName(c, g_ctx.config).c_str(),
+               class_max_scores[static_cast<size_t>(c)],
+               mapModelClassToAppId(c, g_ctx.config));
+    }
 
     for (size_t i = 0;
          i < results.size();
          i++)
     {
-        printf("det.cls_id:%d, det.prop:%f\n",
+        printf("det.app_cls_id:%d, det.prop:%f\n",
                results[i].cls_id,
                results[i].prop);
     }
@@ -456,5 +484,5 @@ void base_model_release()
     g_ctx.g_pose_sampler = nullptr;
     g_ctx.initialized = false;
 
-    printf("carpet_model_release finished\n");
+    printf("robot_ai_model_release finished\n");
 }

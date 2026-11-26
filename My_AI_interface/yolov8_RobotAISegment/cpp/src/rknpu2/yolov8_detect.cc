@@ -1,5 +1,22 @@
 #include "yolov8_detect.h"
 
+static std::vector<std::string> splitCsv(const std::string &s)
+{
+    std::vector<std::string> out;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, ','))
+    {
+        // trim
+        size_t b = item.find_first_not_of(" \t\r\n");
+        size_t e = item.find_last_not_of(" \t\r\n");
+        if (b == std::string::npos)
+            continue;
+        out.push_back(item.substr(b, e - b + 1));
+    }
+    return out;
+}
+
 ConfigInfo readConfig(const std::string &filename)
 {
     ConfigInfo cfg_values;
@@ -15,52 +32,138 @@ ConfigInfo readConfig(const std::string &filename)
     std::string line;
     while (std::getline(file, line))
     {
-        if (line.empty() || line[0] == '#')
-            continue; // 跳过空行和注释
+        if (line.empty())
+            continue;
+        size_t first = line.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos)
+            continue;
+        if (line[first] == '#' ||
+            (line[first] == '/' && first + 1 < line.size() && line[first + 1] == '/'))
+            continue;
 
         std::istringstream iss(line);
         std::string key, value;
         if (std::getline(iss, key, '=') && std::getline(iss, value))
         {
-            config[key] = value;
+            auto comment_pos = value.find("//");
+            if (comment_pos != std::string::npos)
+                value = value.substr(0, comment_pos);
+
+            auto trim = [](std::string &s) {
+                const char *ws = " \t\r\n";
+                auto start = s.find_first_not_of(ws);
+                if (start == std::string::npos)
+                {
+                    s.clear();
+                    return;
+                }
+                auto end = s.find_last_not_of(ws);
+                s = s.substr(start, end - start + 1);
+            };
+            trim(key);
+            trim(value);
+            if (!key.empty())
+                config[key] = value;
         }
     }
 
-    cfg_values.task_name = config["task_name"].c_str();
-    cfg_values.model_path = config["model_path"].c_str();
-    cfg_values.input_width = std::stoi(config["input_width"]);
-    cfg_values.input_height = std::stoi(config["input_height"]);
+    auto get_str = [&](const char *key, const std::string &def = "") -> std::string {
+        auto it = config.find(key);
+        return (it == config.end() || it->second.empty()) ? def : it->second;
+    };
+    auto get_int = [&](const char *key, int def) -> int {
+        auto it = config.find(key);
+        if (it == config.end() || it->second.empty())
+            return def;
+        try
+        {
+            return std::stoi(it->second);
+        }
+        catch (...)
+        {
+            return def;
+        }
+    };
+    auto get_float = [&](const char *key, float def) -> float {
+        auto it = config.find(key);
+        if (it == config.end() || it->second.empty())
+            return def;
+        try
+        {
+            return std::stof(it->second);
+        }
+        catch (...)
+        {
+            return def;
+        }
+    };
 
-    cfg_values.score_threshold = std::stof(config["score_threshold"]); // 输入图片尺寸
-    cfg_values.max_frame_threshold = std::stoi(config["max_frame_threshold"]);
-    cfg_values.BASE_AREA = std::stoi(config["BASE_AREA"]);
+    cfg_values.task_name = get_str("task_name", "robot_ai_detect");
+    cfg_values.model_path = get_str("model_path");
+    cfg_values.input_width = get_int("input_width", 640);
+    cfg_values.input_height = get_int("input_height", 640);
 
-    cfg_values.camera_z_axle_top_resize_rate = std::stof(config["camera_z_axle_top_resize_rate"]); // 相机坐标系，Z轴远端缩放比例
-    cfg_values.camera_z_axle_polyfit_w0 = std::stof(config["camera_z_axle_polyfit_w0"]);
-    cfg_values.camera_z_axle_polyfit_w1 = std::stof(config["camera_z_axle_polyfit_w1"]);
-    cfg_values.camera_z_axle_polyfit_w2 = std::stof(config["camera_z_axle_polyfit_w2"]);
+    cfg_values.score_threshold = get_float("score_threshold", 0.5f);
+    cfg_values.max_frame_threshold = get_int("max_frame_threshold", 3);
+    cfg_values.BASE_AREA = get_int("BASE_AREA", 229);
 
-    // 相机参数配置：
-    cfg_values.camera_fx = std::stof(config["camera_fx"]);
-    cfg_values.camera_fy = std::stof(config["camera_fy"]);
-    cfg_values.camera_cx = std::stof(config["camera_cx"]);
-    cfg_values.camera_cy = std::stof(config["camera_cy"]);
-    cfg_values.camera_H = std::stof(config["camera_H"]);
-    cfg_values.camera_pitch = std::stof(config["camera_pitch"]);
-    cfg_values.camera_D_0 = std::stof(config["camera_D_0"]);
-    cfg_values.camera_D_1 = std::stof(config["camera_D_1"]);
-    cfg_values.camera_D_2 = std::stof(config["camera_D_2"]);
-    cfg_values.camera_D_3 = std::stof(config["camera_D_3"]);
-    cfg_values.camera_D_4 = std::stof(config["camera_D_4"]);
-    cfg_values.camera_D_5 = std::stof(config["camera_D_5"]);
-    cfg_values.camera_D_6 = std::stof(config["camera_D_6"]);
-    cfg_values.camera_D_7 = std::stof(config["camera_D_7"]);
+    cfg_values.num_classes = get_int("num_classes", 4);
+    cfg_values.class_names = splitCsv(get_str("class_names", "carpet,wire,liquid,plasticbag"));
+    {
+        auto id_strs = splitCsv(get_str("class_app_ids", "60,201,221,151"));
+        cfg_values.class_app_ids.clear();
+        for (const auto &s : id_strs)
+        {
+            try
+            {
+                cfg_values.class_app_ids.push_back(std::stoi(s));
+            }
+            catch (...)
+            {
+                cfg_values.class_app_ids.push_back(cfg_values.BASE_AREA);
+            }
+        }
+    }
+    // 长度对齐，避免越界
+    while (static_cast<int>(cfg_values.class_names.size()) < cfg_values.num_classes)
+        cfg_values.class_names.push_back("cls" + std::to_string(cfg_values.class_names.size()));
+    while (static_cast<int>(cfg_values.class_app_ids.size()) < cfg_values.num_classes)
+        cfg_values.class_app_ids.push_back(cfg_values.BASE_AREA);
 
-    cfg_values.debug_score_threshold = std::stof(config["debug_score_threshold"]);
-    cfg_values.save_debug_images_path = config["save_debug_images_path"];
-    cfg_values.save_images_path_spatial_location_val = config["save_images_path_spatial_location_val"];
-    cfg_values.is_save_debug_images = (config["is_save_debug_images"] == "true");
-    cfg_values.fps_limit = std::stoi(config["fps_limit"]);
+    printf("[config] num_classes=%d\n", cfg_values.num_classes);
+    for (int i = 0; i < cfg_values.num_classes; ++i)
+    {
+        printf("[config] model_cls=%d name=%s app_id=%d\n",
+               i,
+               cfg_values.class_names[i].c_str(),
+               cfg_values.class_app_ids[i]);
+    }
+
+    cfg_values.camera_z_axle_top_resize_rate = get_float("camera_z_axle_top_resize_rate", 1.0f);
+    cfg_values.camera_z_axle_polyfit_w0 = get_float("camera_z_axle_polyfit_w0", 0.2220f);
+    cfg_values.camera_z_axle_polyfit_w1 = get_float("camera_z_axle_polyfit_w1", 0.8531f);
+    cfg_values.camera_z_axle_polyfit_w2 = get_float("camera_z_axle_polyfit_w2", 0.1568f);
+
+    cfg_values.camera_fx = get_float("camera_fx", 411.381960f);
+    cfg_values.camera_fy = get_float("camera_fy", 411.535817f);
+    cfg_values.camera_cx = get_float("camera_cx", 637.411269f);
+    cfg_values.camera_cy = get_float("camera_cy", 351.293005f);
+    cfg_values.camera_H = get_float("camera_H", 0.209539f);
+    cfg_values.camera_pitch = get_float("camera_pitch", -0.0318038f);
+    cfg_values.camera_D_0 = get_float("camera_D_0", 1.171783f);
+    cfg_values.camera_D_1 = get_float("camera_D_1", 0.226351f);
+    cfg_values.camera_D_2 = get_float("camera_D_2", 0.000015f);
+    cfg_values.camera_D_3 = get_float("camera_D_3", 0.000199f);
+    cfg_values.camera_D_4 = get_float("camera_D_4", 0.003289f);
+    cfg_values.camera_D_5 = get_float("camera_D_5", 1.455798f);
+    cfg_values.camera_D_6 = get_float("camera_D_6", 0.474246f);
+    cfg_values.camera_D_7 = get_float("camera_D_7", 0.024653f);
+
+    cfg_values.debug_score_threshold = get_float("debug_score_threshold", 0.3f);
+    cfg_values.save_debug_images_path = get_str("save_debug_images_path");
+    cfg_values.save_images_path_spatial_location_val = get_str("save_images_path_spatial_location_val");
+    cfg_values.is_save_debug_images = (get_str("is_save_debug_images", "true") == "true");
+    cfg_values.fps_limit = get_int("fps_limit", 3);
 
     return cfg_values;
 }

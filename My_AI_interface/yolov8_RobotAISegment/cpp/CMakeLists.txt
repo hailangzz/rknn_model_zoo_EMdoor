@@ -109,7 +109,7 @@ endif()
 # ============================================================
 # Shared library (inference interface)
 # ============================================================
-add_library(rknn_carpet_detect SHARED
+add_library(rknn_robotai_detect SHARED
     src/base_detect_interface.cc
     src/postprocess.cc
     src/transform_coordinates.cc
@@ -118,7 +118,7 @@ add_library(rknn_carpet_detect SHARED
     ${rknpu_yolov8_file}
 )
 
-target_include_directories(rknn_carpet_detect PUBLIC
+target_include_directories(rknn_robotai_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/timer
@@ -127,7 +127,7 @@ target_include_directories(rknn_carpet_detect PUBLIC
     ${EIGEN3_INCLUDE_DIRS}
 )
 
-target_link_libraries(rknn_carpet_detect
+target_link_libraries(rknn_robotai_detect
     imageutils
     fileutils
     imagedrawing
@@ -138,14 +138,14 @@ target_link_libraries(rknn_carpet_detect
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
-    target_link_libraries(rknn_carpet_detect Threads::Threads)
+    target_link_libraries(rknn_robotai_detect Threads::Threads)
 endif()
 
 # ============================================================
 # Install
 # ============================================================
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
-install(TARGETS rknn_carpet_detect DESTINATION lib)
+install(TARGETS rknn_robotai_detect DESTINATION lib)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/base.jpg DESTINATION model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION model)

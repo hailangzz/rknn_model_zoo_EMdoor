@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include "rknn_api.h"
 #include "common.h"
 
@@ -46,7 +47,12 @@ struct ConfigInfo
     int input_height;
     float score_threshold;
     int max_frame_threshold;
-    int BASE_AREA; // 基础目标的classid，用于建图时，确认世界地图上障碍物构建，基础区域的重要程度
+    int BASE_AREA; // 未知类别兜底 app id（如 229 调试 id）
+
+    // 多类别：下标 = 模型输出 cls_id
+    int num_classes;
+    std::vector<std::string> class_names; // 如 carpet,wire,liquid,plasticbag
+    std::vector<int> class_app_ids;       // 如 60,201,221,151
 
     float camera_z_axle_top_resize_rate; // 相机坐标系，Z轴远端缩放比例
     float camera_z_axle_polyfit_w0;      // 多项式拟合，二次项系数
@@ -73,3 +79,24 @@ struct ConfigInfo
     bool is_save_debug_images;
     int fps_limit;
 };
+
+// 模型 cls_id -> 建图/业务 app id
+inline int mapModelClassToAppId(int model_cls_id, const ConfigInfo &config)
+{
+    if (model_cls_id >= 0 &&
+        model_cls_id < static_cast<int>(config.class_app_ids.size()))
+    {
+        return config.class_app_ids[model_cls_id];
+    }
+    return config.BASE_AREA;
+}
+
+inline std::string getModelClassName(int model_cls_id, const ConfigInfo &config)
+{
+    if (model_cls_id >= 0 &&
+        model_cls_id < static_cast<int>(config.class_names.size()))
+    {
+        return config.class_names[model_cls_id];
+    }
+    return "unknown";
+}

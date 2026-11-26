@@ -2,7 +2,7 @@
 // 模型输入图像尺寸
 // 预测框置信度
 
-task_name=carpet_detect
+task_name=robot_ai_detect
 model_path=./model/robot_ai-seg_v001_date_20261126_yolov8s_p0.temp-r0.temp-map0.temp_release-20261126.rknn
 input_width=640
 input_height=640
@@ -11,10 +11,16 @@ score_threshold=0.5f
 //检测帧数阈值
 max_frame_threshold=3
 
-//BASE的类别ID，于建图配合，设定BASE目标的重要程度
+//BASE的类别ID，于建图配合；未知/兜底类别使用
 // 229：感知调试id（调试使用，不影响设备运动控制）
-// 60:地毯检测、201：线材检测、221：液体检测、
 BASE_AREA=229
+
+// 多类别配置（顺序必须与模型输出 class id 0..N-1 一致）
+// 换模型时只需改这两行 + model/coco_80_labels_list.txt
+// 当前：0地毯60、1线材201、2液体221、3塑料袋151
+num_classes=4
+class_names=carpet,wire,liquid,plasticbag
+class_app_ids=60,201,221,151
 
 //相机坐标系：远端Z轴比例缩放
 camera_z_axle_top_resize_rate=1.0
@@ -41,7 +47,7 @@ camera_D_7=0.024653
 //debug配置管理
 debug_score_threshold=0.3f
 //save_debug_images_path=/home/robot/zhangzhuo/catkin_ws/CarpetSegmentProject/images
-save_debug_images_path=/home/robot/share/AI_Program/CarpetSegmentProject/images
-save_images_path_spatial_location_val=/home/robot/share/AI_Program/CarpetSegmentProject/spatial_location_val_images
+save_debug_images_path=/home/robot/share/AI_Program/RobotAiSegmentProject/images
+save_images_path_spatial_location_val=/home/robot/share/AI_Program/RobotAiSegmentProject/spatial_location_val_images
 is_save_debug_images=true
 fps_limit=3
